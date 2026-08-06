@@ -13,14 +13,33 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-  process.env.BETTER_AUTH_URL?.replace(/\/$/, "") ||
-  "https://ekonzo.cd";
+function resolveSiteUrl() {
+  const fromEnv =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+    process.env.BETTER_AUTH_URL?.replace(/\/$/, "");
+  if (fromEnv && !fromEnv.includes("localhost")) return fromEnv;
 
-const siteTitle = "ekonzo — Bons du Trésor de la RDC";
+  const vercelProd = process.env.VERCEL_PROJECT_PRODUCTION_URL?.replace(
+    /\/$/,
+    "",
+  );
+  if (vercelProd) return `https://${vercelProd}`;
+
+  const vercel = process.env.VERCEL_URL?.replace(/\/$/, "");
+  if (vercel) return `https://${vercel}`;
+
+  return fromEnv || "https://ekonzo.cd";
+}
+
+const siteUrl = resolveSiteUrl();
+
+/** Titre court : WhatsApp le coupe vite */
+const siteTitle = "ekonzo — Bons du Trésor RDC";
+/** ~110–140 car. : mieux affiché dans l’aperçu WhatsApp */
 const siteDescription =
-  "Souscrivez aux Bons du Trésor émis par le Ministère des Finances de la République Démocratique du Congo. Plateforme officielle, sécurisée, accessible via Mobile Money.";
+  "Souscrivez aux Bons du Trésor du Ministère des Finances (RDC). Plateforme officielle, sécurisée, paiement Mobile Money.";
+
+const ogImageUrl = `${siteUrl}/og-image.jpg`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -58,10 +77,12 @@ export const metadata: Metadata = {
     description: siteDescription,
     images: [
       {
-        url: "/og-image.jpg",
+        url: ogImageUrl,
+        secureUrl: ogImageUrl,
+        type: "image/jpeg",
         width: 1200,
         height: 630,
-        alt: "ekonzo — Plateforme de souscription aux Bons du Trésor de la RDC",
+        alt: "ekonzo — Bons du Trésor de la RDC",
       },
     ],
   },
@@ -69,7 +90,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: siteTitle,
     description: siteDescription,
-    images: ["/og-image.jpg"],
+    images: [ogImageUrl],
   },
   robots: {
     index: true,
@@ -89,6 +110,15 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-icon.png", type: "image/png", sizes: "180x180" }],
     shortcut: "/logo.webp",
+  },
+  other: {
+    "og:title": siteTitle,
+    "og:description": siteDescription,
+    "og:image": ogImageUrl,
+    "og:image:secure_url": ogImageUrl,
+    "og:image:type": "image/jpeg",
+    "og:image:width": "1200",
+    "og:image:height": "630",
   },
 };
 
