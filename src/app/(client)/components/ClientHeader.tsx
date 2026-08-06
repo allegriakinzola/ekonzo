@@ -40,7 +40,7 @@ export function ClientHeader({ userName, kycStatus }: { userName: string; kycSta
           <Image src="/logo.webp" alt="Ministère des Finances" width={36} height={36} className="object-contain" />
           <div className="hidden sm:block">
             <p className="text-sm font-bold tracking-tight text-primary leading-none">ekonzo</p>
-            <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Bons & Obligations du Trésor</p>
+            <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Bons du Trésor · RDC</p>
           </div>
         </Link>
 

@@ -97,7 +97,7 @@ export default async function PortfolioPage() {
             <p className="text-4xl mb-4">📊</p>
             <p className="font-semibold text-base">Aucune souscription</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Souscrivez à un Bon ou une Obligation du Trésor pour commencer à investir.
+              Souscrivez à un Bon du Trésor pour commencer à investir.
             </p>
             <Link
               href="/products"

@@ -66,7 +66,7 @@ export default function LoginPage() {
             Investissez dans les titres du Trésor de la RDC
           </p>
           <p className="text-primary-foreground/80 text-sm leading-relaxed">
-            Bons et Obligations du Trésor, accessibles à tous, dès 10 000 CDF.
+            Bons du Trésor, accessibles à tous, dès 10 000 CDF.
             Rendements garantis par l&apos;État congolais.
           </p>
         </div>

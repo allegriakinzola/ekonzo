@@ -15,7 +15,15 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "ekonzo — Investissez dans les titres du Trésor",
-  description: "Plateforme de souscription aux Bons et Obligations du Trésor de la RDC.",
+  description: "Plateforme de souscription aux Bons du Trésor de la RDC.",
+  icons: {
+    icon: [
+      { url: "/logo.webp", type: "image/webp" },
+      { url: "/icon.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: [{ url: "/apple-icon.png", type: "image/png", sizes: "180x180" }],
+    shortcut: "/logo.webp",
+  },
 };
 
 export default function RootLayout({
