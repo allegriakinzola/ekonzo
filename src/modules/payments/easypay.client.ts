@@ -1,66 +1,48 @@
-import type {
-  EasyPayInitResponse,
-  EasyPayStatusResponse,
-  InitMomoPaymentParams,
-} from "./easypay.types";
-
-const EASYPAY_MODE = process.env.EASYPAY_MODE ?? "sandbox";
-const EASYPAY_CID = process.env.EASYPAY_CID ?? "";
-const EASYPAY_TOKEN = process.env.EASYPAY_TOKEN ?? "";
-
-const EASYPAY_BASE = `https://www.e-com-easypay.com/${EASYPAY_MODE}`;
-
-function authQuery(): string {
-  const params = new URLSearchParams({
-    cid: EASYPAY_CID,
-    token: EASYPAY_TOKEN,
-  });
-  return params.toString();
-}
-
 /**
- * Génère un order_ref conforme EasyPay : 6 à 16 caractères alphanumériques,
- * unique par transaction. Préfixe "EK" + fragment de l'id de souscription.
+ * @deprecated Utiliser EasyPayProvider via getPaymentProvider().
+ * Conservé pour compatibilité — délègue au provider actif.
  */
-export function buildOrderRef(subscriptionId: string): string {
-  const fragment = subscriptionId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 12);
-  return `EK${fragment}`.slice(0, 16).toUpperCase();
-}
+import { EasyPayProvider } from "./providers/easypay.provider";
+import type { InitMomoPaymentParams, EasyPayInitResponse, EasyPayStatusResponse } from "./easypay.types";
+import { normalizeMomoPhone } from "./phone";
 
-/**
- * API 4 — paiement Mobile Money sans redirection.
- * EasyPay envoie un prompt USSD sur le téléphone du client.
- */
+export { buildOrderRef } from "./payment.provider";
+export { normalizeMomoPhone };
+
+const provider = new EasyPayProvider();
+
 export async function initMomoPayment(
-  params: InitMomoPaymentParams
+  params: InitMomoPaymentParams,
 ): Promise<EasyPayInitResponse> {
-  const res = await fetch(`${EASYPAY_BASE}/mobile-money/payment?${authQuery()}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      order_ref: params.orderRef,
-      amount: params.amount,
-      currency: params.currency,
-      description: params.description,
-      customer_name: params.customerName,
-      customer_phone: params.customerPhone,
-      customer_email: params.customerEmail ?? "",
-    }),
-  });
-
-  return (await res.json()) as EasyPayInitResponse;
+  const result = await provider.initMomoPayment(params);
+  if (result.success && result.providerRef) {
+    return { code: 1, reference: result.providerRef };
+  }
+  return { code: 0, message: result.message ?? "Erreur EasyPay" };
 }
 
-/**
- * API 3 — vérifier le statut d'une transaction (backup si l'IPN n'arrive pas).
- */
 export async function checkPaymentStatus(
-  reference: string
+  reference: string,
 ): Promise<EasyPayStatusResponse> {
-  const res = await fetch(
-    `${EASYPAY_BASE}/payment/${reference}/checking-status?${authQuery()}`,
-    { method: "GET" }
-  );
+  const result = await provider.checkStatus(reference);
+  const status =
+    result.status === "SUCCESS"
+      ? "SUCCESS"
+      : result.status === "CANCELLED"
+        ? "CANCELED"
+        : result.status === "FAILED"
+          ? "DECLINED"
+          : "CANCELED";
 
-  return (await res.json()) as EasyPayStatusResponse;
+  return {
+    transaction: {
+      order_ref: result.orderRef,
+      reference: result.providerRef,
+    },
+    payment: {
+      channel: "MOBILE MONEY",
+      status: status as "SUCCESS" | "CANCELED" | "DECLINED",
+      reference: result.providerRef,
+    },
+  };
 }

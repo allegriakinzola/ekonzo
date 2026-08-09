@@ -1,19 +1,63 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/session";
-import { prisma } from "@/lib/prisma";
-import { formatAmount, formatDate } from "@/lib/format";
+import {
+  BriefcaseIcon,
+  ChartLineUpIcon,
+  PlusIcon,
+} from "@phosphor-icons/react/dist/ssr";
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  PENDING_PAYMENT:          { label: "En attente de paiement",    color: "bg-amber-100 text-amber-700" },
-  PAYMENT_CONFIRMED:        { label: "Paiement confirmé",          color: "bg-blue-100 text-blue-700" },
-  SUBMITTED:                { label: "Soumis",                     color: "bg-indigo-100 text-indigo-700" },
-  ADJUDICATED:              { label: "Adjugé",                     color: "bg-emerald-100 text-emerald-700" },
-  PARTIALLY_ADJUDICATED:    { label: "Partiellement adjugé",       color: "bg-yellow-100 text-yellow-700" },
-  ACTIVE:                   { label: "Actif",                      color: "bg-emerald-100 text-emerald-700" },
-  REIMBURSED:               { label: "Remboursé",                  color: "bg-slate-100 text-slate-600" },
-  CANCELLED:                { label: "Annulé",                     color: "bg-red-100 text-red-600" },
-  FAILED:                   { label: "Échoué",                     color: "bg-red-100 text-red-600" },
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { formatAmount, formatDate } from "@/lib/format";
+import { prisma } from "@/lib/prisma";
+import { requireRole } from "@/lib/session";
+import { cn } from "@/lib/utils";
+
+const STATUS_LABELS: Record<string, string> = {
+  PENDING_PAYMENT: "En attente de paiement",
+  PAYMENT_CONFIRMED: "Paiement confirmé",
+  SUBMITTED: "Soumis",
+  ADJUDICATED: "Adjugé",
+  PARTIALLY_ADJUDICATED: "Partiellement adjugé",
+  ACTIVE: "Actif",
+  REIMBURSED: "Remboursé",
+  CANCELLED: "Annulé",
+  FAILED: "Échoué",
 };
+
+function statusBadgeClass(status: string) {
+  switch (status) {
+    case "ADJUDICATED":
+    case "ACTIVE":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "PAYMENT_CONFIRMED":
+      return "border-primary/20 bg-primary/10 text-primary";
+    case "SUBMITTED":
+      return "border-rdc-navy/20 bg-rdc-navy/10 text-rdc-navy";
+    case "PENDING_PAYMENT":
+    case "PARTIALLY_ADJUDICATED":
+      return "border-amber-200 bg-amber-50 text-amber-800";
+    case "CANCELLED":
+    case "FAILED":
+      return "border-destructive/20 bg-destructive/10 text-destructive";
+    default:
+      return "border-border bg-muted text-muted-foreground";
+  }
+}
 
 export default async function PortfolioPage() {
   const session = await requireRole("CLIENT");
@@ -23,7 +67,14 @@ export default async function PortfolioPage() {
       where: { userId: session.user.id },
       include: {
         product: {
-          select: { code: true, type: true, currency: true, maturityDate: true, discountRate: true, couponRate: true },
+          select: {
+            code: true,
+            type: true,
+            currency: true,
+            maturityDate: true,
+            discountRate: true,
+            couponRate: true,
+          },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -33,8 +84,14 @@ export default async function PortfolioPage() {
     }),
   ]);
 
-  const activeSubscriptions = subscriptions.filter(
-    (s) => ["ACTIVE", "ADJUDICATED", "PARTIALLY_ADJUDICATED", "PAYMENT_CONFIRMED", "SUBMITTED"].includes(s.status)
+  const activeSubscriptions = subscriptions.filter((s) =>
+    [
+      "ACTIVE",
+      "ADJUDICATED",
+      "PARTIALLY_ADJUDICATED",
+      "PAYMENT_CONFIRMED",
+      "SUBMITTED",
+    ].includes(s.status),
   );
   const totalInvestedUSD = activeSubscriptions
     .filter((s) => s.currency === "USD")
@@ -45,119 +102,184 @@ export default async function PortfolioPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Mon portefeuille</h1>
-        <p className="text-sm text-muted-foreground mt-1">Suivi de vos placements et de votre solde</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-primary">
+            <BriefcaseIcon className="size-5" weight="duotone" />
+            <span className="text-xs font-medium uppercase tracking-wide">
+              Placements
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-rdc-navy">
+            Mon portefeuille
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Suivi de vos placements et de votre solde
+          </p>
+        </div>
+        <Button render={<Link href="/products" />} size="lg">
+          <PlusIcon className="size-4" weight="bold" />
+          Nouvelle souscription
+        </Button>
       </div>
 
-      {/* Wallets */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Capital investi USD */}
-        <div className="rounded-xl border bg-white p-5">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Capital investi (USD)</p>
-          <p className="text-2xl font-bold mt-1.5">{formatAmount(totalInvestedUSD.toString(), "USD")}</p>
-          <p className="text-xs text-muted-foreground mt-1">{activeSubscriptions.filter(s => s.currency === "USD").length} placement(s) actif(s)</p>
-        </div>
-        {/* Capital investi CDF */}
-        <div className="rounded-xl border bg-white p-5">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Capital investi (CDF)</p>
-          <p className="text-2xl font-bold mt-1.5">{formatAmount(totalInvestedCDF.toString(), "CDF")}</p>
-          <p className="text-xs text-muted-foreground mt-1">{activeSubscriptions.filter(s => s.currency === "CDF").length} placement(s) actif(s)</p>
-        </div>
-        {/* Wallets */}
-        {wallets.length > 0 ? wallets.map((w) => (
-          <div key={w.id} className="rounded-xl border bg-white p-5">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Solde wallet ({w.currency})</p>
-            <p className="text-2xl font-bold mt-1.5">{formatAmount(w.balance.toString(), w.currency)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Disponible</p>
-          </div>
-        )) : (
-          <div className="rounded-xl border bg-white p-5">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Solde wallet</p>
-            <p className="text-2xl font-bold mt-1.5">—</p>
-            <p className="text-xs text-muted-foreground mt-1">Aucun wallet créé</p>
-          </div>
-        )}
-      </div>
-
-      {/* Subscriptions */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold">Mes souscriptions</h2>
-          <Link
-            href="/products"
-            className="text-xs font-medium text-primary hover:underline"
-          >
-            + Nouvelle souscription
-          </Link>
-        </div>
-
-        {subscriptions.length === 0 ? (
-          <div className="rounded-xl border bg-white p-12 text-center">
-            <p className="text-4xl mb-4">📊</p>
-            <p className="font-semibold text-base">Aucune souscription</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Souscrivez à un Bon du Trésor pour commencer à investir.
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card className="ring-1 ring-rdc-navy/5">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-[11px] font-medium uppercase tracking-wide">
+              Capital investi (USD)
+            </CardDescription>
+            <CardTitle className="text-2xl font-bold tracking-tight">
+              {formatAmount(totalInvestedUSD.toString(), "USD")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              {
+                activeSubscriptions.filter((s) => s.currency === "USD").length
+              }{" "}
+              placement(s) actif(s)
             </p>
-            <Link
-              href="/products"
-              className="inline-flex items-center gap-2 mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
-            >
-              Voir les produits →
-            </Link>
-          </div>
+          </CardContent>
+        </Card>
+        <Card className="ring-1 ring-rdc-navy/5">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-[11px] font-medium uppercase tracking-wide">
+              Capital investi (CDF)
+            </CardDescription>
+            <CardTitle className="text-2xl font-bold tracking-tight">
+              {formatAmount(totalInvestedCDF.toString(), "CDF")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              {
+                activeSubscriptions.filter((s) => s.currency === "CDF").length
+              }{" "}
+              placement(s) actif(s)
+            </p>
+          </CardContent>
+        </Card>
+        {wallets.length > 0 ? (
+          wallets.map((w) => (
+            <Card key={w.id} className="ring-1 ring-rdc-navy/5">
+              <CardHeader className="pb-2">
+                <CardDescription className="text-[11px] font-medium uppercase tracking-wide">
+                  Solde wallet ({w.currency})
+                </CardDescription>
+                <CardTitle className="text-2xl font-bold tracking-tight">
+                  {formatAmount(w.balance.toString(), w.currency)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Disponible</p>
+              </CardContent>
+            </Card>
+          ))
         ) : (
-          <div className="rounded-xl border bg-white overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-slate-50 text-xs text-muted-foreground uppercase tracking-wide">
-                    <th className="text-left px-4 py-3 font-medium">Produit</th>
-                    <th className="text-left px-4 py-3 font-medium">Montant</th>
-                    <th className="text-left px-4 py-3 font-medium">Titres</th>
-                    <th className="text-left px-4 py-3 font-medium">Taux</th>
-                    <th className="text-left px-4 py-3 font-medium">Maturité</th>
-                    <th className="text-left px-4 py-3 font-medium">Statut</th>
-                    <th className="text-left px-4 py-3 font-medium">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {subscriptions.map((s) => {
-                    const rate = s.adjudicatedRate ?? s.product.discountRate;
-                    const st = STATUS_LABELS[s.status] ?? { label: s.status, color: "bg-slate-100 text-slate-600" };
-                    return (
-                      <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <div>
-                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold mr-1.5 bg-blue-100 text-blue-700">
-                              BT
-                            </span>
-                            <span className="font-mono text-xs">{s.product.code}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 font-medium">
-                          {formatAmount((s.adjudicatedAmount ?? s.amount).toString(), s.currency)}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{s.units}</td>
-                        <td className="px-4 py-3 font-medium text-primary">
-                          {rate ? `${(Number(rate) * 100).toFixed(2)} %` : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{formatDate(s.product.maturityDate)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${st.color}`}>
-                            {st.label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground text-xs">{formatDate(s.createdAt)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <Card className="ring-1 ring-rdc-navy/5">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-[11px] font-medium uppercase tracking-wide">
+                Solde wallet
+              </CardDescription>
+              <CardTitle className="text-2xl font-bold tracking-tight">
+                —
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Aucun wallet créé</p>
+            </CardContent>
+          </Card>
         )}
       </div>
+
+      <Card className="border-border/80 bg-card shadow-sm ring-1 ring-rdc-navy/5">
+        <CardHeader className="border-b [.border-b]:pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Mes souscriptions</CardTitle>
+              <CardDescription>
+                Historique et statut de vos placements
+              </CardDescription>
+            </div>
+            <ChartLineUpIcon
+              className="size-5 text-muted-foreground"
+              weight="duotone"
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {subscriptions.length === 0 ? (
+            <div className="space-y-4 px-6 py-16 text-center">
+              <p className="font-semibold text-base">Aucune souscription</p>
+              <p className="text-sm text-muted-foreground">
+                Souscrivez à un Bon du Trésor pour commencer à investir.
+              </p>
+              <Button render={<Link href="/products" />}>
+                Voir les produits
+              </Button>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="px-4">Produit</TableHead>
+                  <TableHead className="px-4">Montant</TableHead>
+                  <TableHead className="px-4">Taux</TableHead>
+                  <TableHead className="px-4">Maturité</TableHead>
+                  <TableHead className="px-4">Statut</TableHead>
+                  <TableHead className="px-4">Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {subscriptions.map((s) => {
+                  const rate = s.adjudicatedRate ?? s.product.discountRate;
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <Badge
+                            variant="outline"
+                            className="border-primary/20 bg-primary/10 text-primary"
+                          >
+                            BT
+                          </Badge>
+                          <span className="font-mono text-xs">
+                            {s.product.code}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 font-medium">
+                        {formatAmount(
+                          (s.adjudicatedAmount ?? s.amount).toString(),
+                          s.currency,
+                        )}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 font-medium text-primary">
+                        {rate ? `${(Number(rate) * 100).toFixed(2)} %` : "—"}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-muted-foreground">
+                        {formatDate(s.product.maturityDate)}
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <Badge
+                          variant="outline"
+                          className={cn(statusBadgeClass(s.status))}
+                        >
+                          {STATUS_LABELS[s.status] ?? s.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-xs text-muted-foreground">
+                        {formatDate(s.createdAt)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

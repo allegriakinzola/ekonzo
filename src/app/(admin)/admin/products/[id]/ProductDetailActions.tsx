@@ -2,10 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ArrowRightIcon } from "@phosphor-icons/react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export function ProductDetailActions({
   productId,
-  currentStatus,
   nextStatus,
   nextLabel,
 }: {
@@ -28,33 +37,41 @@ export function ProductDetailActions({
     router.refresh();
   }
 
-  const COLORS: Record<string, string> = {
-    OPEN:        "bg-emerald-600 hover:bg-emerald-700",
-    CLOSED:      "bg-orange-600 hover:bg-orange-700",
-    ADJUDICATED: "bg-blue-600 hover:bg-blue-700",
-    ACTIVE:      "bg-violet-600 hover:bg-violet-700",
-    MATURED:     "bg-slate-600 hover:bg-slate-700",
+  const DESCRIPTIONS: Record<string, string> = {
+    OPEN: "Le produit devient visible et souscriptible par les investisseurs.",
+    CLOSED:
+      "La période de souscription est terminée. Les investisseurs ne peuvent plus souscrire.",
+    ADJUDICATED:
+      "Les souscriptions sont traitées. Vous pouvez maintenant adjuger individuellement.",
+    ACTIVE: "Le produit est actif — les investisseurs détiennent leurs titres.",
+    MATURED:
+      "Le produit est arrivé à maturité. Le capital est à rembourser.",
   };
 
-  const DESCRIPTIONS: Record<string, string> = {
-    OPEN:        "Le produit devient visible et souscriptible par les investisseurs.",
-    CLOSED:      "La période de souscription est terminée. Les investisseurs ne peuvent plus souscrire.",
-    ADJUDICATED: "Les souscriptions sont traitées. Vous pouvez maintenant adjuger individuellement.",
-    ACTIVE:      "Le produit est actif — les investisseurs détiennent leurs titres.",
-    MATURED:     "Le produit est arrivé à maturité. Le capital est à rembourser.",
+  const buttonClass: Record<string, string> = {
+    OPEN: "bg-emerald-600 text-white hover:bg-emerald-700",
+    CLOSED: "bg-amber-600 text-white hover:bg-amber-700",
+    ADJUDICATED: "bg-primary text-primary-foreground hover:bg-primary/90",
+    ACTIVE: "bg-rdc-navy text-white hover:bg-rdc-navy/90",
+    MATURED: "bg-muted-foreground text-white hover:bg-muted-foreground/90",
   };
 
   return (
-    <div className="rounded-xl border bg-white p-5">
-      <h3 className="text-sm font-semibold mb-1">Faire avancer le statut</h3>
-      <p className="text-xs text-muted-foreground mb-4">{DESCRIPTIONS[nextStatus]}</p>
-      <button
-        onClick={handleTransition}
-        disabled={loading}
-        className={`h-10 rounded-lg px-5 text-sm font-semibold text-white disabled:opacity-50 transition-colors ${COLORS[nextStatus] ?? "bg-primary hover:bg-primary/90"}`}
-      >
-        {loading ? "…" : `→ Passer en "${nextLabel}"`}
-      </button>
-    </div>
+    <Card className="ring-1 ring-rdc-navy/5">
+      <CardHeader>
+        <CardTitle className="text-base">Faire avancer le statut</CardTitle>
+        <CardDescription>{DESCRIPTIONS[nextStatus]}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button
+          onClick={handleTransition}
+          disabled={loading}
+          className={buttonClass[nextStatus] ?? ""}
+        >
+          <ArrowRightIcon weight="bold" />
+          {loading ? "…" : `Passer en « ${nextLabel} »`}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

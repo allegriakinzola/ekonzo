@@ -1,6 +1,33 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import {
+  CreditCardIcon,
+  IdentificationCardIcon,
+  ListBulletsIcon,
+  UsersThreeIcon,
+  WarningCircleIcon,
+} from "@phosphor-icons/react/dist/ssr";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatAmount, formatDate } from "@/lib/format";
+import { prisma } from "@/lib/prisma";
+import { cn } from "@/lib/utils";
 
 export default async function AdminOverviewPage() {
   const [
@@ -27,110 +54,196 @@ export default async function AdminOverviewPage() {
   ]);
 
   const STATS = [
-    { label: "KYC en attente", value: kycPending, sub: `${kycTotal} dossiers au total`, color: "bg-amber-50 border-amber-100", icon: "🪪", href: "/admin/kyc" },
-    { label: "Utilisateurs (clients)", value: usersTotal, sub: "Comptes actifs", color: "bg-blue-50 border-blue-100", icon: "👥", href: "/admin/users" },
-    { label: "Produits ouverts", value: openProducts, sub: "Disponibles à la souscription", color: "bg-emerald-50 border-emerald-100", icon: "📋", href: "/admin/products" },
-    { label: "Paiements en attente", value: pendingPayment, sub: "À confirmer", color: "bg-violet-50 border-violet-100", icon: "💳", href: "/admin/subscriptions" },
+    {
+      label: "KYC en attente",
+      value: kycPending,
+      sub: `${kycTotal} dossiers au total`,
+      href: "/admin/kyc",
+      icon: IdentificationCardIcon,
+      accent: "text-amber-700 bg-amber-50 ring-amber-100",
+    },
+    {
+      label: "Utilisateurs (clients)",
+      value: usersTotal,
+      sub: "Comptes actifs",
+      href: "/admin/users",
+      icon: UsersThreeIcon,
+      accent: "text-primary bg-primary/10 ring-primary/15",
+    },
+    {
+      label: "Produits ouverts",
+      value: openProducts,
+      sub: "Disponibles à la souscription",
+      href: "/admin/products",
+      icon: ListBulletsIcon,
+      accent: "text-emerald-700 bg-emerald-50 ring-emerald-100",
+    },
+    {
+      label: "Paiements en attente",
+      value: pendingPayment,
+      sub: "À confirmer",
+      href: "/admin/subscriptions",
+      icon: CreditCardIcon,
+      accent: "text-rdc-navy bg-rdc-navy/10 ring-rdc-navy/15",
+    },
   ];
 
   const SUB_STATUS: Record<string, string> = {
-    PENDING_PAYMENT: "bg-amber-100 text-amber-700",
-    PAYMENT_CONFIRMED: "bg-blue-100 text-blue-700",
-    SUBMITTED: "bg-indigo-100 text-indigo-700",
-    ADJUDICATED: "bg-emerald-100 text-emerald-700",
-    ACTIVE: "bg-emerald-100 text-emerald-700",
-    CANCELLED: "bg-red-100 text-red-600",
-    FAILED: "bg-red-100 text-red-600",
-    REIMBURSED: "bg-slate-100 text-slate-600",
+    PENDING_PAYMENT: "border-amber-200 bg-amber-50 text-amber-800",
+    PAYMENT_CONFIRMED: "border-primary/20 bg-primary/10 text-primary",
+    SUBMITTED: "border-rdc-navy/20 bg-rdc-navy/10 text-rdc-navy",
+    ADJUDICATED: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    ACTIVE: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    CANCELLED: "border-destructive/20 bg-destructive/10 text-destructive",
+    FAILED: "border-destructive/20 bg-destructive/10 text-destructive",
+    REIMBURSED: "border-border bg-muted text-muted-foreground",
   };
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Vue d&apos;ensemble</h1>
-        <p className="text-sm text-muted-foreground mt-1">Tableau de bord de l&apos;administration ekonzo</p>
+      <div className="space-y-1">
+        <p className="text-xs font-medium uppercase tracking-wide text-primary">
+          Administration
+        </p>
+        <h1 className="text-2xl font-bold tracking-tight text-rdc-navy">
+          Vue d&apos;ensemble
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Tableau de bord de l&apos;administration ekonzo
+        </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {STATS.map((s) => (
-          <Link key={s.label} href={s.href} className={`rounded-xl border p-5 ${s.color} hover:shadow-sm transition-shadow`}>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{s.label}</p>
-                <p className="mt-1.5 text-3xl font-bold tracking-tight">{s.value}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{s.sub}</p>
-              </div>
-              <span className="text-2xl">{s.icon}</span>
-            </div>
-          </Link>
-        ))}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {STATS.map((s) => {
+          const Icon = s.icon;
+          return (
+            <Link key={s.label} href={s.href} className="group">
+              <Card className="h-full transition-shadow group-hover:shadow-md ring-1 ring-rdc-navy/5">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <CardDescription className="text-[11px] font-medium uppercase tracking-wide">
+                      {s.label}
+                    </CardDescription>
+                    <span
+                      className={cn(
+                        "inline-flex size-9 items-center justify-center rounded-lg ring-1",
+                        s.accent,
+                      )}
+                    >
+                      <Icon className="size-4" weight="duotone" />
+                    </span>
+                  </div>
+                  <CardTitle className="text-3xl font-bold tracking-tight">
+                    {s.value}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">{s.sub}</p>
+                </CardContent>
+              </Card>
+            </Link>
+          );
+        })}
       </div>
 
-      {/* KYC alert */}
       {kycPending > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-xl">⚡</span>
-            <div>
-              <p className="font-semibold text-sm text-amber-800">{kycPending} dossier{kycPending > 1 ? "s" : ""} KYC en attente de traitement</p>
-              <p className="text-xs text-amber-700 mt-0.5">Traitez les dossiers pour permettre aux utilisateurs d&apos;investir.</p>
-            </div>
-          </div>
-          <Link href="/admin/kyc" className="flex-shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-colors">
-            Traiter →
-          </Link>
-        </div>
+        <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+          <WarningCircleIcon className="size-4 text-amber-700" weight="fill" />
+          <AlertTitle className="text-amber-900">
+            {kycPending} dossier{kycPending > 1 ? "s" : ""} KYC en attente
+          </AlertTitle>
+          <AlertDescription className="flex flex-col gap-3 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Traitez les dossiers pour permettre aux utilisateurs d&apos;investir.
+            </span>
+            <Button
+              render={<Link href="/admin/kyc" />}
+              size="sm"
+              className="bg-amber-700 text-white hover:bg-amber-800"
+            >
+              Traiter
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
 
-      {/* Recent subscriptions */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold">Souscriptions récentes</h2>
-          <Link href="/admin/subscriptions" className="text-xs text-primary hover:underline">Voir toutes →</Link>
-        </div>
-
-        {recentSubs.length === 0 ? (
-          <div className="rounded-xl border bg-white p-8 text-center text-sm text-muted-foreground">
-            Aucune souscription pour le moment.
+      <Card className="ring-1 ring-rdc-navy/5">
+        <CardHeader className="border-b [.border-b]:pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Souscriptions récentes</CardTitle>
+              <CardDescription>
+                Dernières demandes de souscription aux Bons du Trésor
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              render={<Link href="/admin/subscriptions" />}
+            >
+              Voir toutes
+            </Button>
           </div>
-        ) : (
-          <div className="rounded-xl border bg-white overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-slate-50 text-xs text-muted-foreground uppercase tracking-wide">
-                  <th className="text-left px-4 py-3 font-medium">Investisseur</th>
-                  <th className="text-left px-4 py-3 font-medium">Produit</th>
-                  <th className="text-left px-4 py-3 font-medium">Montant</th>
-                  <th className="text-left px-4 py-3 font-medium">Statut</th>
-                  <th className="text-left px-4 py-3 font-medium">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
+        </CardHeader>
+        <CardContent className="p-0">
+          {recentSubs.length === 0 ? (
+            <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+              Aucune souscription pour le moment.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="px-4">Investisseur</TableHead>
+                  <TableHead className="px-4">Produit</TableHead>
+                  <TableHead className="px-4">Montant</TableHead>
+                  <TableHead className="px-4">Statut</TableHead>
+                  <TableHead className="px-4">Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {recentSubs.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-sm">{s.user.name}</p>
-                      <p className="text-xs text-muted-foreground">{s.user.phoneNumber}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold mr-1 bg-blue-100 text-blue-700">BT</span>
+                  <TableRow key={s.id}>
+                    <TableCell className="px-4 py-3 whitespace-normal">
+                      <p className="text-sm font-medium">{s.user.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {s.user.phoneNumber}
+                      </p>
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <Badge
+                        variant="outline"
+                        className="mr-1 border-primary/20 bg-primary/10 text-primary"
+                      >
+                        BT
+                      </Badge>
                       <span className="font-mono text-xs">{s.product.code}</span>
-                    </td>
-                    <td className="px-4 py-3 font-medium">{formatAmount(s.amount.toString(), s.product.currency)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${SUB_STATUS[s.status] ?? "bg-slate-100 text-slate-600"}`}>
+                    </TableCell>
+                    <TableCell className="px-4 py-3 font-medium">
+                      {formatAmount(s.amount.toString(), s.product.currency)}
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "",
+                          SUB_STATUS[s.status] ??
+                            "border-border bg-muted text-muted-foreground",
+                        )}
+                      >
                         {s.status.replace(/_/g, " ")}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(s.createdAt)}</td>
-                  </tr>
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-muted-foreground">
+                      {formatDate(s.createdAt)}
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

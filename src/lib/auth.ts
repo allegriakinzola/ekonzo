@@ -4,6 +4,11 @@ import { admin, phoneNumber } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { prisma } from "./prisma";
 import { sendSms } from "./sms";
+import {
+  isValidMomoPhone,
+  normalizeMomoPhone,
+  toSmsPhone,
+} from "@/modules/payments/phone";
 
 const ac = createAccessControl({
   user: ["list", "set-role", "ban", "unban", "delete"] as const,
@@ -39,6 +44,11 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24, // 24h
     updateAge: 60 * 60 * 12, // rafraîchit après 12h
+    // Évite un aller-retour DB à chaque navigation (cookie signé, courte durée).
+    cookieCache: {
+      enabled: true,
+      maxAge: 60 * 2, // 2 minutes
+    },
   },
 
   user: {
@@ -48,21 +58,31 @@ export const auth = betterAuth({
         defaultValue: "CLIENT",
         input: false, // un utilisateur ne peut pas choisir son rôle à l'inscription
       },
+      kycStatus: {
+        type: "string",
+        defaultValue: "PENDING",
+        input: false,
+      },
     },
   },
 
   plugins: [
     // Connexion principale : numéro de téléphone + OTP SMS
     phoneNumber({
+      phoneNumberValidator: (phone) =>
+        isValidMomoPhone(normalizeMomoPhone(phone)),
       sendOTP: async ({ phoneNumber, code }) => {
-        console.log(`[OTP] → ${phoneNumber} : ${code}`);
-        await sendSms(phoneNumber, `Votre code de vérification ekonzo : ${code}`);
+        const local = normalizeMomoPhone(phoneNumber);
+        const smsTo = toSmsPhone(local);
+        console.log(`[OTP] → ${local} (sms ${smsTo}) : ${code}`);
+        await sendSms(smsTo, `Votre code de vérification ekonzo : ${code}`);
       },
       otpLength: 6,
       expiresIn: 300, // 5 minutes
       signUpOnVerification: {
-        getTempEmail: (phone) => `${phone}@phone.ekonzo.cd`,
-        getTempName: (phone) => phone,
+        getTempEmail: (phone) =>
+          `${normalizeMomoPhone(phone)}@phone.ekonzo.cd`,
+        getTempName: (phone) => normalizeMomoPhone(phone),
       },
     }),
 

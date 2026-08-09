@@ -11,21 +11,29 @@ async function requireAdmin() {
   return session;
 }
 
-const createSchema = z.object({
-  code: z.string().min(2).max(20),
-  type: z.enum(["BT", "OT"]).optional(),
-  currency: z.enum(["CDF", "USD"]),
-  faceValue: z.number().positive(),
-  minTicket: z.number().positive(),
-  discountRate: z.number().min(0).max(1).optional(),
-  couponRate: z.number().min(0).max(1).optional(),
-  couponFrequency: z.enum(["MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL", "AT_MATURITY"]).optional(),
-  issuanceDate: z.string(),
-  maturityDate: z.string(),
-  adjudicationDate: z.string(),
-  subscriptionDeadline: z.string(),
-  totalVolume: z.number().positive(),
-});
+const createSchema = z
+  .object({
+    code: z.string().min(2).max(20),
+    type: z.enum(["BT", "OT"]).optional(),
+    currency: z.enum(["CDF", "USD"]),
+    /** @deprecated conservé pour compat DB — égalé au ticket minimum si absent */
+    faceValue: z.number().positive().optional(),
+    minTicket: z.number().positive(),
+    discountRate: z.number().min(0).max(1).optional(),
+    couponRate: z.number().min(0).max(1).optional(),
+    couponFrequency: z
+      .enum(["MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL", "AT_MATURITY"])
+      .optional(),
+    issuanceDate: z.string(),
+    maturityDate: z.string(),
+    adjudicationDate: z.string(),
+    subscriptionDeadline: z.string(),
+    totalVolume: z.number().positive(),
+  })
+  .refine((d) => d.minTicket <= d.totalVolume, {
+    message: "Le ticket minimum ne peut pas dépasser le montant total annoncé",
+    path: ["minTicket"],
+  });
 
 export async function GET(req: NextRequest) {
   const session = await requireAdmin();
@@ -53,12 +61,14 @@ export async function POST(req: NextRequest) {
   }
 
   const d = body.data;
+  // Modèle grand public : montant libre ≥ ticket mini. faceValue = minTicket (compat schéma).
+  const faceValue = d.faceValue ?? d.minTicket;
   const product = await prisma.product.create({
     data: {
       code: d.code.toUpperCase(),
       type: d.type ?? "BT",
       currency: d.currency,
-      faceValue: d.faceValue,
+      faceValue,
       minTicket: d.minTicket,
       discountRate: d.discountRate,
       couponRate: d.couponRate,

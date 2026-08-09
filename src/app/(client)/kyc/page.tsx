@@ -1,5 +1,21 @@
-import { requireRole } from "@/lib/session";
+import {
+  CheckCircleIcon,
+  ClockIcon,
+  IdentificationCardIcon,
+  WarningCircleIcon,
+} from "@phosphor-icons/react/dist/ssr";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
+import { requireRole } from "@/lib/session";
 import { KycFlow } from "./KycFlow";
 
 const DOC_LABELS: Record<string, string> = {
@@ -15,7 +31,6 @@ export default async function KycPage() {
     where: { userId: session.user.id },
   });
 
-  // ✅ Vérifié — informations en lecture seule, non modifiables
   if (kyc?.status === "VERIFIED") {
     const INFO = [
       ["Type de document", DOC_LABELS[kyc.docType] ?? kyc.docType],
@@ -27,72 +42,130 @@ export default async function KycPage() {
       ["Adresse", kyc.address ?? "—"],
     ];
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Identité vérifiée</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Vos informations ont été validées et ne peuvent plus être modifiées.
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-primary">
+            <IdentificationCardIcon className="size-5" weight="duotone" />
+            <span className="text-xs font-medium uppercase tracking-wide">
+              Identité
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-rdc-navy">
+            Identité vérifiée
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Vos informations ont été validées et ne peuvent plus être
+            modifiées.
           </p>
         </div>
 
-        <div className="rounded-xl border bg-white overflow-hidden">
-          <div className="flex items-center gap-3 px-5 py-4 border-b bg-emerald-50">
-            <span className="text-2xl">✅</span>
-            <div>
-              <p className="font-semibold text-sm text-emerald-800">Compte vérifié</p>
-              <p className="text-xs text-emerald-700">
-                Validé le {kyc.verifiedAt ? new Date(kyc.verifiedAt).toLocaleDateString("fr-CD") : "—"}
-              </p>
+        <Card className="ring-1 ring-rdc-navy/5">
+          <CardHeader className="border-b border-emerald-100 bg-emerald-50/60 [.border-b]:pb-4">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex size-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                <CheckCircleIcon className="size-5" weight="fill" />
+              </span>
+              <div>
+                <CardTitle className="text-base text-emerald-900">
+                  Compte vérifié
+                </CardTitle>
+                <CardDescription className="text-emerald-700">
+                  Validé le{" "}
+                  {kyc.verifiedAt
+                    ? new Date(kyc.verifiedAt).toLocaleDateString("fr-CD")
+                    : "—"}
+                </CardDescription>
+              </div>
+              <Badge
+                variant="outline"
+                className="ml-auto border-emerald-200 bg-emerald-50 text-emerald-700"
+              >
+                Vérifié
+              </Badge>
             </div>
-          </div>
-          <div className="divide-y">
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-3 pt-4 sm:grid-cols-2">
             {INFO.map(([label, value]) => (
-              <div key={label} className="flex items-center justify-between px-5 py-3">
-                <span className="text-sm text-muted-foreground">{label}</span>
-                <span className="text-sm font-medium">{value}</span>
+              <div
+                key={label}
+                className="rounded-lg border border-border bg-muted/50 px-3 py-2.5"
+              >
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {label}
+                </p>
+                <p className="mt-0.5 text-sm font-semibold">{value}</p>
               </div>
             ))}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-center text-xs text-muted-foreground">
           Pour toute correction, contactez le support ekonzo.
         </p>
       </div>
     );
   }
 
-  // ⏳ Soumis — en attente de revue admin
   if (kyc?.status === "SUBMITTED" || kyc?.status === "UNDER_REVIEW") {
     return (
-      <div className="max-w-2xl mx-auto">
-        <div className="rounded-xl border bg-white p-10 text-center space-y-3">
-          <p className="text-4xl">⏳</p>
-          <h1 className="text-xl font-bold">Dossier en cours d&apos;examen</h1>
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-primary">
+            <IdentificationCardIcon className="size-5" weight="duotone" />
+            <span className="text-xs font-medium uppercase tracking-wide">
+              Identité
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-rdc-navy">
+            Dossier en cours d&apos;examen
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Votre visage n&apos;a pas pu être vérifié automatiquement. Un agent examine
-            votre dossier — réponse sous 24 à 48h.
+            Un agent examine votre dossier — réponse sous 24 à 48h.
           </p>
         </div>
+
+        <Card className="ring-1 ring-rdc-navy/5">
+          <CardContent className="space-y-3 py-10 text-center">
+            <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+              <ClockIcon className="size-8" weight="duotone" />
+            </div>
+            <h2 className="text-lg font-bold text-rdc-navy">
+              Vérification manuelle en cours
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Votre visage n&apos;a pas pu être vérifié automatiquement. Un
+              agent examine votre dossier — réponse sous 24 à 48h.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  // ❌ Rejeté ou jamais soumis — (re)faire le parcours
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Vérification d&apos;identité</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 text-primary">
+          <IdentificationCardIcon className="size-5" weight="duotone" />
+          <span className="text-xs font-medium uppercase tracking-wide">
+            Identité
+          </span>
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-rdc-navy">
+          Vérification d&apos;identité
+        </h1>
+        <p className="text-sm text-muted-foreground">
           {kyc?.status === "REJECTED"
             ? "Votre dossier a été rejeté — recommencez la vérification."
             : "Complétez votre vérification pour pouvoir investir."}
         </p>
       </div>
       {kyc?.status === "REJECTED" && kyc.rejectedNote && (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-          Motif du rejet : {kyc.rejectedNote}
-        </div>
+        <Alert variant="destructive">
+          <WarningCircleIcon className="size-4" weight="fill" />
+          <AlertTitle>Motif du rejet</AlertTitle>
+          <AlertDescription>{kyc.rejectedNote}</AlertDescription>
+        </Alert>
       )}
       <KycFlow />
     </div>

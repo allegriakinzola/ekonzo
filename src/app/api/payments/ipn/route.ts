@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getPaymentProvider } from "@/modules/payments/payment.service";
+import { applyPaymentResult } from "@/modules/payments/payment.confirm";
 
 /**
  * POST /api/payments/ipn
- * Webhook générique — reçoit les notifications de paiement du provider actif.
- * EasyPay envoie un POST avec le statut de la transaction quand l'utilisateur
- * confirme ou annule le paiement USSD.
+ * IPN EasyPay — configurez cette URL dans l’espace marchand EasyPay
+ * (et EASYPAY_CALLBACK_URL). En local, utiliser un tunnel (ngrok) car
+ * EasyPay ne peut pas joindre localhost.
  *
- * Configurer dans EasyPay : https://votre-domaine.com/api/payments/ipn
+ * Corps attendu :
+ * {
+ *   transaction: { order_ref, reference },
+ *   payment: { channel, status: SUCCESS|CANCELED|DECLINED, reference }
+ * }
  */
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -18,32 +22,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Corps invalide" }, { status: 400 });
   }
 
+  console.log("[EasyPay IPN] Reçu:", JSON.stringify(body));
+
   const provider = getPaymentProvider();
   const payload = provider.parseIpn(body);
 
   if (!payload) {
-    return NextResponse.json({ error: "Payload IPN non reconnu" }, { status: 400 });
+    // Répondre 200 pour éviter les retries infinis sur payload inconnu,
+    // mais journaliser.
+    console.warn("[EasyPay IPN] Payload non reconnu");
+    return NextResponse.json({ received: true, ignored: true });
   }
 
-  const subscription = await prisma.subscription.findFirst({
-    where: { paymentRef: payload.providerRef },
+  const result = await applyPaymentResult({
+    providerRef: payload.providerRef,
+    orderRef: payload.orderRef,
+    status: payload.status,
+    verifyWithProvider: true,
+    rawPayload: body,
   });
 
-  if (!subscription) {
-    return NextResponse.json({ error: "Souscription introuvable" }, { status: 404 });
+  if (!result.ok && result.message?.includes("introuvable")) {
+    // 200 pour stopper les retries EasyPay ; l’anomalie est loguée.
+    return NextResponse.json({ received: true, matched: false });
   }
 
-  if (payload.status === "SUCCESS") {
-    await prisma.subscription.update({
-      where: { id: subscription.id },
-      data: { status: "PAYMENT_CONFIRMED" },
-    });
-  } else if (payload.status === "CANCELLED" || payload.status === "FAILED") {
-    await prisma.subscription.update({
-      where: { id: subscription.id },
-      data: { status: "CANCELLED" },
-    });
-  }
-
-  return NextResponse.json({ received: true });
+  return NextResponse.json({
+    received: true,
+    status: result.status,
+    alreadyProcessed: result.alreadyProcessed ?? false,
+  });
 }

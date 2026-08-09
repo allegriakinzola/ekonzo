@@ -42,7 +42,7 @@ export function AdminSidebar({ userName, role }: AdminSidebarProps) {
     <AppSidebar
       userName={userName}
       statusLabel={`⚙ ${roleLabel}`}
-      statusColor="violet"
+      statusColor="slate"
       navItems={NAV_ITEMS}
     />
   );

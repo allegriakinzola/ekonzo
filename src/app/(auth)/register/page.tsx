@@ -10,12 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
+import {
+  isValidMomoPhone,
+  MOMO_PHONE_ERROR,
+  normalizeMomoPhone,
+} from "@/modules/payments/phone";
 
 const registerSchema = z.object({
   phoneNumber: z
     .string()
-    .min(9, "Numéro invalide")
-    .regex(/^[0-9+]+$/, "Chiffres uniquement"),
+    .transform((v) => normalizeMomoPhone(v))
+    .refine(isValidMomoPhone, MOMO_PHONE_ERROR),
 });
 
 const otpSchema = z.object({
@@ -292,7 +297,18 @@ export default function RegisterPage() {
             <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="phone">Numéro de téléphone</Label>
-                <Input id="phone" placeholder="+243 812 345 678" type="tel" className="h-11" {...registerForm.register("phoneNumber")} />
+                <Input
+                  id="phone"
+                  placeholder="812345678"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={9}
+                  className="h-11"
+                  {...registerForm.register("phoneNumber")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  9 chiffres, sans 0 ni +243 — ce numéro servira aussi pour Mobile Money.
+                </p>
                 {registerForm.formState.errors.phoneNumber && (
                   <p className="text-xs text-destructive">{registerForm.formState.errors.phoneNumber.message}</p>
                 )}

@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/session";
+import { Separator } from "@/components/ui/separator";
 import { AdminSidebar } from "./components/AdminSidebar";
 
 export default async function AdminLayout({
@@ -11,15 +12,20 @@ export default async function AdminLayout({
   const role = (session.user as { role?: string }).role ?? "ADMIN";
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="flex min-h-screen bg-[linear-gradient(180deg,oklch(0.98_0.01_220)_0%,oklch(0.97_0.005_264)_100%)]">
       <AdminSidebar userName={userName} role={role} />
-      <div className="flex-1 flex flex-col lg:ml-64">
+      <div className="flex flex-1 flex-col lg:ml-64">
+        <div className="h-1 w-full bg-[linear-gradient(90deg,var(--rdc-red)_0%,var(--primary)_45%,var(--rdc-navy)_100%)]" />
         <div className="lg:hidden h-14" />
-        <main className="flex-1 px-4 lg:px-8 py-8 max-w-5xl w-full mx-auto">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 lg:px-8">
           {children}
         </main>
-        <footer className="border-t py-5 text-center text-xs text-muted-foreground">
-          <p>© {new Date().getFullYear()} ekonzo · Ministère des Finances de la RDC</p>
+        <Separator />
+        <footer className="py-5 text-center text-xs text-muted-foreground">
+          <p>
+            © {new Date().getFullYear()} ekonzo · Ministère des Finances de la
+            RDC
+          </p>
         </footer>
       </div>
     </div>

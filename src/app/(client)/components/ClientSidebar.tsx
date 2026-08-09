@@ -1,6 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { WarningCircleIcon } from "@phosphor-icons/react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { AppSidebar } from "@/components/AppSidebar";
 
 const NAV_ITEMS = [
@@ -42,18 +46,24 @@ export function ClientSidebar({ userName, kycStatus }: ClientSidebarProps) {
   return (
     <AppSidebar
       userName={userName}
-      statusLabel={verified ? "✓ Identité vérifiée" : "⚠ Identité non vérifiée"}
+      statusLabel={verified ? "Identité vérifiée" : "Identité non vérifiée"}
       statusColor={verified ? "emerald" : "amber"}
       navItems={NAV_ITEMS}
       alert={
         !verified ? (
-          <Link
-            href="/kyc"
-            className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0" />
-            Identité non vérifiée
-          </Link>
+          <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+            <WarningCircleIcon className="size-4 text-amber-700" weight="fill" />
+            <AlertTitle className="text-amber-900">Identité non vérifiée</AlertTitle>
+            <AlertDescription className="text-amber-800">
+              <Button
+                render={<Link href="/kyc" />}
+                size="sm"
+                className="mt-2 bg-amber-700 text-white hover:bg-amber-800"
+              >
+                Vérifier
+              </Button>
+            </AlertDescription>
+          </Alert>
         ) : undefined
       }
     />

@@ -157,7 +157,7 @@ export default function RootLayout({
       lang="fr"
       className={cn("h-full antialiased", geistSans.variable, geistMono.variable)}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

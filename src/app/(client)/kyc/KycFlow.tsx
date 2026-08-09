@@ -2,25 +2,35 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  CarIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  CreditCardIcon,
+  IdentificationCardIcon,
+  WarningCircleIcon,
+} from "@phosphor-icons/react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 const DOC_TYPES = [
-  { value: "CNI", label: "Carte d'identité", icon: "🪪" },
-  { value: "PASSPORT", label: "Passeport", icon: "📕" },
-  { value: "PERMIS", label: "Permis de conduire", icon: "🚗" },
-] as const;
+  { value: "CNI" as const, label: "Carte d'identité", icon: IdentificationCardIcon },
+  { value: "PASSPORT" as const, label: "Passeport", icon: CreditCardIcon },
+  { value: "PERMIS" as const, label: "Permis de conduire", icon: CarIcon },
+];
 
 type Step = "document" | "confirm" | "selfie" | "result";
-
-const STEP_TITLES: Record<Step, string> = {
-  document: "Pièce d'identité",
-  confirm: "Vos informations",
-  selfie: "Photo selfie",
-  result: "Résultat",
-};
 
 interface KycFields {
   firstName: string;
@@ -38,11 +48,20 @@ export function KycFlow() {
   const [docFile, setDocFile] = useState<File | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [fields, setFields] = useState<KycFields>({
-    firstName: "", lastName: "", postName: "", dateOfBirth: "", docNumber: "", address: "",
+    firstName: "",
+    lastName: "",
+    postName: "",
+    dateOfBirth: "",
+    docNumber: "",
+    address: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ approved: boolean; similarity: number; message: string } | null>(null);
+  const [result, setResult] = useState<{
+    approved: boolean;
+    similarity: number;
+    message: string;
+  } | null>(null);
 
   async function onExtractDocument() {
     if (!docFile) {
@@ -69,7 +88,11 @@ export function KycFlow() {
       });
       setStep("confirm");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erreur lors de la lecture du document.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erreur lors de la lecture du document.",
+      );
     } finally {
       setLoading(false);
     }
@@ -102,7 +125,10 @@ export function KycFlow() {
       formData.append("docNumber", fields.docNumber);
       formData.append("address", fields.address);
 
-      const res = await fetch("/api/kyc/verify-face", { method: "POST", body: formData });
+      const res = await fetch("/api/kyc/verify-face", {
+        method: "POST",
+        body: formData,
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
 
@@ -113,7 +139,11 @@ export function KycFlow() {
       });
       setStep("result");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erreur lors de la vérification.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erreur lors de la vérification.",
+      );
     } finally {
       setLoading(false);
     }
@@ -121,170 +151,286 @@ export function KycFlow() {
 
   if (step === "result" && result) {
     return (
-      <div className="rounded-xl border bg-white p-8 text-center space-y-4">
-        <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full text-3xl ${
-          result.approved ? "bg-emerald-100" : "bg-amber-100"
-        }`}>
-          {result.approved ? "✅" : "⏳"}
-        </div>
-        <div>
-          <h3 className="text-lg font-bold">
-            {result.approved ? "Identité vérifiée !" : "Vérification en cours"}
-          </h3>
-          <p className="text-sm text-muted-foreground mt-1">{result.message}</p>
-          {result.approved && (
-            <p className="text-xs text-emerald-600 mt-2">Correspondance faciale : {result.similarity}%</p>
-          )}
-        </div>
-        <Button onClick={() => router.push("/dashboard")} className="w-full h-11">
-          Aller au tableau de bord
-        </Button>
-      </div>
+      <Card className="ring-1 ring-rdc-navy/5">
+        <CardContent className="space-y-4 py-8 text-center">
+          <div
+            className={cn(
+              "mx-auto flex size-16 items-center justify-center rounded-full ring-1",
+              result.approved
+                ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+                : "bg-amber-50 text-amber-700 ring-amber-100",
+            )}
+          >
+            {result.approved ? (
+              <CheckCircleIcon className="size-8" weight="fill" />
+            ) : (
+              <ClockIcon className="size-8" weight="duotone" />
+            )}
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-rdc-navy">
+              {result.approved
+                ? "Identité vérifiée"
+                : "Vérification en cours"}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {result.message}
+            </p>
+            {result.approved && (
+              <p className="mt-2 text-xs text-emerald-600">
+                Correspondance faciale : {result.similarity}%
+              </p>
+            )}
+          </div>
+          <Button
+            onClick={() => router.push("/dashboard")}
+            className="h-11 w-full"
+            size="lg"
+          >
+            Aller au tableau de bord
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Stepper */}
       <div className="flex gap-1">
         {(["document", "confirm", "selfie"] as const).map((s, i) => {
           const currentIdx = ["document", "confirm", "selfie"].indexOf(step);
           return (
             <div
               key={s}
-              className={`h-1 flex-1 rounded-full ${currentIdx >= i ? "bg-primary" : "bg-muted"}`}
+              className={cn(
+                "h-1 flex-1 rounded-full",
+                currentIdx >= i ? "bg-primary" : "bg-muted",
+              )}
             />
           );
         })}
       </div>
 
       {error && (
-        <Alert variant="destructive" className="text-sm">{error}</Alert>
+        <Alert variant="destructive">
+          <WarningCircleIcon className="size-4" weight="fill" />
+          <AlertTitle>Erreur</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      {/* Étape 1 — Document */}
       {step === "document" && (
-        <div className="rounded-xl border bg-white p-6 space-y-5">
-          <div>
-            <h3 className="font-semibold text-sm">Type de document</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Choisissez votre pièce d'identité</p>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {DOC_TYPES.map((d) => (
-              <button
-                key={d.value}
-                type="button"
-                onClick={() => setDocType(d.value)}
-                className={`rounded-lg border p-3 text-center transition-colors ${
-                  docType === d.value
-                    ? "border-primary bg-primary/5 ring-1 ring-primary"
-                    : "hover:bg-slate-50"
-                }`}
-              >
-                <p className="text-2xl mb-1">{d.icon}</p>
-                <p className="text-xs font-medium leading-tight">{d.label}</p>
-              </button>
-            ))}
-          </div>
+        <Card className="ring-1 ring-rdc-navy/5">
+          <CardHeader className="border-b [.border-b]:pb-4">
+            <CardTitle className="text-base">Type de document</CardTitle>
+            <CardDescription>
+              Choisissez votre pièce d&apos;identité
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5 pt-4">
+            <div className="grid grid-cols-3 gap-2">
+              {DOC_TYPES.map((d) => {
+                const Icon = d.icon;
+                return (
+                  <button
+                    key={d.value}
+                    type="button"
+                    onClick={() => setDocType(d.value)}
+                    className={cn(
+                      "rounded-lg border p-3 text-center transition-colors",
+                      docType === d.value
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "hover:bg-muted/50",
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        "mx-auto mb-1 size-6",
+                        docType === d.value
+                          ? "text-primary"
+                          : "text-muted-foreground",
+                      )}
+                      weight="duotone"
+                    />
+                    <p className="text-xs font-medium leading-tight">
+                      {d.label}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="docFile">Photo du document (recto)</Label>
-            <Input
-              id="docFile"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="h-11 pt-2"
-              onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Photo nette, bien éclairée, texte lisible. Max 5 Mo.
-            </p>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="docFile">Photo du document (recto)</Label>
+              <Input
+                id="docFile"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="h-11 pt-2"
+                onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Photo nette, bien éclairée, texte lisible. Max 5 Mo.
+              </p>
+            </div>
 
-          <Button onClick={onExtractDocument} className="w-full h-11" disabled={loading || !docFile}>
-            {loading ? "Lecture du document…" : "Analyser mon document"}
-          </Button>
-        </div>
+            <Button
+              onClick={onExtractDocument}
+              className="h-11 w-full"
+              size="lg"
+              disabled={loading || !docFile}
+            >
+              {loading ? "Lecture du document…" : "Analyser mon document"}
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Étape 2 — Confirmation */}
       {step === "confirm" && (
-        <div className="rounded-xl border bg-white p-6 space-y-4">
-          <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-800">
-            Ces informations ont été extraites de votre document. Corrigez-les si nécessaire.
-          </div>
+        <Card className="ring-1 ring-rdc-navy/5">
+          <CardHeader className="border-b [.border-b]:pb-4">
+            <CardTitle className="text-base">Vos informations</CardTitle>
+            <CardDescription>
+              Vérifiez et corrigez si nécessaire
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-4">
+            <Alert className="border-primary/20 bg-primary/5 text-primary">
+              <IdentificationCardIcon className="size-4" weight="duotone" />
+              <AlertTitle>Extraction automatique</AlertTitle>
+              <AlertDescription className="text-primary/80">
+                Ces informations ont été extraites de votre document. Corrigez-les
+                si nécessaire.
+              </AlertDescription>
+            </Alert>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Nom</Label>
-              <Input className="h-10" value={fields.lastName}
-                onChange={(e) => setFields((f) => ({ ...f, lastName: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Nom</Label>
+                <Input
+                  className="h-10"
+                  value={fields.lastName}
+                  onChange={(e) =>
+                    setFields((f) => ({ ...f, lastName: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Post-nom</Label>
+                <Input
+                  className="h-10"
+                  value={fields.postName}
+                  onChange={(e) =>
+                    setFields((f) => ({ ...f, postName: e.target.value }))
+                  }
+                />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Post-nom</Label>
-              <Input className="h-10" value={fields.postName}
-                onChange={(e) => setFields((f) => ({ ...f, postName: e.target.value }))} />
+              <Label>Prénom</Label>
+              <Input
+                className="h-10"
+                value={fields.firstName}
+                onChange={(e) =>
+                  setFields((f) => ({ ...f, firstName: e.target.value }))
+                }
+              />
             </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Prénom</Label>
-            <Input className="h-10" value={fields.firstName}
-              onChange={(e) => setFields((f) => ({ ...f, firstName: e.target.value }))} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Date de naissance</Label>
+                <Input
+                  className="h-10"
+                  placeholder="jj/mm/aaaa"
+                  value={fields.dateOfBirth}
+                  onChange={(e) =>
+                    setFields((f) => ({ ...f, dateOfBirth: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>N° du document</Label>
+                <Input
+                  className="h-10 bg-muted/50"
+                  value={fields.docNumber}
+                  readOnly
+                  disabled
+                />
+              </div>
+            </div>
             <div className="space-y-1.5">
-              <Label>Date de naissance</Label>
-              <Input className="h-10" placeholder="jj/mm/aaaa" value={fields.dateOfBirth}
-                onChange={(e) => setFields((f) => ({ ...f, dateOfBirth: e.target.value }))} />
+              <Label>Adresse complète</Label>
+              <Input
+                className="h-10"
+                value={fields.address}
+                onChange={(e) =>
+                  setFields((f) => ({ ...f, address: e.target.value }))
+                }
+              />
             </div>
-            <div className="space-y-1.5">
-              <Label>N° du document</Label>
-              <Input className="h-10 bg-slate-50" value={fields.docNumber} readOnly disabled />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Adresse complète</Label>
-            <Input className="h-10" value={fields.address}
-              onChange={(e) => setFields((f) => ({ ...f, address: e.target.value }))} />
-          </div>
 
-          <Button onClick={onConfirmFields} className="w-full h-11" disabled={loading}>
-            Suivant
-          </Button>
-          <button type="button" onClick={() => setStep("document")}
-            className="w-full text-center text-sm text-muted-foreground hover:text-foreground">
-            ← Reprendre la photo du document
-          </button>
-        </div>
+            <Button
+              onClick={onConfirmFields}
+              className="h-11 w-full"
+              size="lg"
+              disabled={loading}
+            >
+              Suivant
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => setStep("document")}
+            >
+              Reprendre la photo du document
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Étape 3 — Selfie */}
       {step === "selfie" && (
-        <div className="rounded-xl border bg-white p-6 space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="selfieFile">Votre photo selfie</Label>
-            <Input
-              id="selfieFile"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              capture="user"
-              className="h-11 pt-2"
-              onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Visage bien visible, sans lunettes de soleil ni masque. Nous comparons
-              cette photo avec celle de votre document.
-            </p>
-          </div>
+        <Card className="ring-1 ring-rdc-navy/5">
+          <CardHeader className="border-b [.border-b]:pb-4">
+            <CardTitle className="text-base">Photo selfie</CardTitle>
+            <CardDescription>
+              Nous comparons cette photo avec celle de votre document
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="selfieFile">Votre photo selfie</Label>
+              <Input
+                id="selfieFile"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="user"
+                className="h-11 pt-2"
+                onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Visage bien visible, sans lunettes de soleil ni masque.
+              </p>
+            </div>
 
-          <Button onClick={onVerifySelfie} className="w-full h-11" disabled={loading || !selfieFile}>
-            {loading ? "Vérification du visage…" : "Vérifier mon identité"}
-          </Button>
-          <button type="button" onClick={() => setStep("confirm")}
-            className="w-full text-center text-sm text-muted-foreground hover:text-foreground">
-            ← Retour
-          </button>
-        </div>
+            <Button
+              onClick={onVerifySelfie}
+              className="h-11 w-full"
+              size="lg"
+              disabled={loading || !selfieFile}
+            >
+              {loading ? "Vérification du visage…" : "Vérifier mon identité"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => setStep("confirm")}
+            >
+              Retour
+            </Button>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

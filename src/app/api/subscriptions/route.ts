@@ -5,13 +5,19 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { getPaymentProvider } from "@/modules/payments/payment.service";
 import { buildOrderRef } from "@/modules/payments/payment.provider";
+import {
+  createPendingPaymentTransaction,
+} from "@/modules/payments/payment.confirm";
+import {
+  inferMomoOperator,
+  isValidMomoPhone,
+  normalizeMomoPhone,
+} from "@/modules/payments/phone";
 
 const bodySchema = z.object({
   productId: z.string().min(1),
   amount: z.number().positive(),
   paymentChannel: z.enum(["MOBILE_MONEY", "BANK_TRANSFER"]),
-  momoOperator: z.enum(["AIRTEL", "ORANGE", "MPESA"]).optional(),
-  momoPhone: z.string().optional(),
   bankName: z.string().optional(),
   bankAccount: z.string().optional(),
   bankTransferRef: z.string().optional(),
@@ -23,7 +29,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { kycStatus: true },
+    select: { kycStatus: true, phoneNumber: true },
   });
   if (user?.kycStatus !== "VERIFIED") {
     return NextResponse.json({ error: "KYC non vérifié" }, { status: 403 });
@@ -34,7 +40,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Données invalides", details: body.error.flatten() }, { status: 400 });
   }
 
-  const { productId, amount, paymentChannel, momoOperator, momoPhone, bankName, bankAccount, bankTransferRef } = body.data;
+  const {
+    productId,
+    amount,
+    paymentChannel,
+    bankName,
+    bankAccount,
+    bankTransferRef,
+  } = body.data;
 
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product || product.status !== "OPEN") {
@@ -46,25 +59,55 @@ export async function POST(req: NextRequest) {
     }, { status: 400 });
   }
 
-  const volumeLeft = Number(product.totalVolume) - Number(product.allocatedVolume);
+  const committed = await prisma.subscription.aggregate({
+    where: {
+      productId,
+      status: { notIn: ["CANCELLED", "FAILED"] },
+    },
+    _sum: { amount: true },
+  });
+  const volumeLeft =
+    Number(product.totalVolume) - Number(committed._sum.amount ?? 0);
   if (amount > volumeLeft) {
-    return NextResponse.json({ error: "Volume insuffisant sur ce produit" }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: `Montant trop élevé. Il reste ${volumeLeft.toLocaleString("fr-CD")} ${product.currency} disponibles sur cette émission.`,
+      },
+      { status: 400 },
+    );
   }
 
-  const units = Math.floor(amount / Number(product.faceValue));
-  if (units < 1) {
-    return NextResponse.json({ error: "Montant insuffisant pour acquérir au moins un titre" }, { status: 400 });
-  }
-
+  const units = 1;
   let momoAccountId: string | undefined;
   let bankAccountId: string | undefined;
+  let momoPhone: string | undefined;
 
   if (paymentChannel === "MOBILE_MONEY") {
-    if (!momoOperator || !momoPhone) {
-      return NextResponse.json({ error: "Opérateur et numéro MoMo requis" }, { status: 400 });
+    if (!user?.phoneNumber) {
+      return NextResponse.json(
+        { error: "Aucun numéro de téléphone associé à votre compte." },
+        { status: 400 },
+      );
     }
+    momoPhone = normalizeMomoPhone(user.phoneNumber);
+    if (!isValidMomoPhone(momoPhone)) {
+      return NextResponse.json(
+        {
+          error:
+            "Le numéro de votre compte est invalide. Contactez le support (format attendu : 9 chiffres, ex. 812345678).",
+        },
+        { status: 400 },
+      );
+    }
+    const momoOperator = inferMomoOperator(momoPhone);
     const momo = await prisma.momoAccount.upsert({
-      where: { userId_operator_phoneNumber: { userId: session.user.id, operator: momoOperator, phoneNumber: momoPhone } },
+      where: {
+        userId_operator_phoneNumber: {
+          userId: session.user.id,
+          operator: momoOperator,
+          phoneNumber: momoPhone,
+        },
+      },
       update: {},
       create: {
         userId: session.user.id,
@@ -81,7 +124,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Banque et numéro de compte requis" }, { status: 400 });
     }
     const bank = await prisma.bankAccount.upsert({
-      where: { userId_accountNumber_currency: { userId: session.user.id, accountNumber: bankAccount, currency: product.currency } },
+      where: {
+        userId_accountNumber_currency: {
+          userId: session.user.id,
+          accountNumber: bankAccount,
+          currency: product.currency,
+        },
+      },
       update: {},
       create: {
         userId: session.user.id,
@@ -112,37 +161,63 @@ export async function POST(req: NextRequest) {
   });
 
   if (paymentChannel === "MOBILE_MONEY") {
-    try {
-      const provider = getPaymentProvider();
-      const orderRef = buildOrderRef(subscription.id);
-      const result = await provider.initMomoPayment({
-        orderRef,
-        amount: Number(amount),
-        currency: product.currency as "CDF" | "USD",
-        description: `Souscription ${product.code} — ${units} titre(s)`,
-        customerName: subscription.user.name ?? "",
-        customerPhone: momoPhone!,
-        customerEmail: subscription.user.email ?? undefined,
-      });
+    const provider = getPaymentProvider();
+    const orderRef = buildOrderRef(subscription.id);
+    const result = await provider.initMomoPayment({
+      orderRef,
+      amount: Number(amount),
+      currency: product.currency as "CDF" | "USD",
+      description: `Souscription ${product.code} — ${amount} ${product.currency}`,
+      customerName: subscription.user.name || "Client ekonzo",
+      customerPhone: momoPhone!,
+      customerEmail: subscription.user.email ?? undefined,
+    });
 
-      if (result.success && result.providerRef) {
-        await prisma.subscription.update({
-          where: { id: subscription.id },
-          data: { paymentRef: result.providerRef },
-        });
-        return NextResponse.json(
-          { ...subscription, paymentRef: result.providerRef, momoPromptSent: true },
-          { status: 201 }
-        );
-      } else {
-        return NextResponse.json(
-          { ...subscription, momoPromptSent: false, momoError: result.message },
-          { status: 201 }
-        );
-      }
-    } catch {
-      return NextResponse.json({ ...subscription, momoPromptSent: false }, { status: 201 });
+    if (!result.success || !result.providerRef) {
+      await prisma.subscription.update({
+        where: { id: subscription.id },
+        data: { status: "FAILED" },
+      });
+      return NextResponse.json(
+        {
+          error:
+            result.message ??
+            "Impossible d'envoyer le prompt USSD. Vérifiez vos clés EasyPay et réessayez.",
+          subscriptionId: subscription.id,
+          momoPromptSent: false,
+        },
+        { status: 502 },
+      );
     }
+
+    await prisma.subscription.update({
+      where: { id: subscription.id },
+      data: { paymentRef: result.providerRef },
+    });
+
+    await createPendingPaymentTransaction({
+      userId: session.user.id,
+      subscriptionId: subscription.id,
+      amount: Number(amount),
+      currency: product.currency as "CDF" | "USD",
+      orderRef,
+      providerRef: result.providerRef,
+      paymentChannel: "MOBILE_MONEY",
+    });
+
+    return NextResponse.json(
+      {
+        id: subscription.id,
+        status: "PENDING_PAYMENT",
+        paymentRef: result.providerRef,
+        orderRef,
+        momoPromptSent: true,
+        momoPhone,
+        amount,
+        currency: product.currency,
+      },
+      { status: 201 },
+    );
   }
 
   return NextResponse.json(subscription, { status: 201 });

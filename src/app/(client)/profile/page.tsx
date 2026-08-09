@@ -1,14 +1,51 @@
-import { requireRole } from "@/lib/session";
-import { prisma } from "@/lib/prisma";
-import { formatDate } from "@/lib/format";
+import {
+  IdentificationCardIcon,
+  LockIcon,
+  UserCircleIcon,
+} from "@phosphor-icons/react/dist/ssr";
 
-const KYC_STATUS: Record<string, { label: string; color: string; icon: string }> = {
-  PENDING:      { label: "Non soumis",          color: "text-slate-500",   icon: "○" },
-  SUBMITTED:    { label: "En cours de vérif.",  color: "text-blue-600",    icon: "⏳" },
-  UNDER_REVIEW: { label: "En révision",         color: "text-indigo-600",  icon: "🔍" },
-  VERIFIED:     { label: "Vérifié",             color: "text-emerald-600", icon: "✓" },
-  APPROVED:     { label: "Approuvé",            color: "text-emerald-600", icon: "✓" },
-  REJECTED:     { label: "Rejeté",              color: "text-red-600",     icon: "✗" },
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { formatDate } from "@/lib/format";
+import { prisma } from "@/lib/prisma";
+import { requireRole } from "@/lib/session";
+import { cn } from "@/lib/utils";
+
+const KYC_LABELS: Record<string, string> = {
+  PENDING: "Non soumis",
+  SUBMITTED: "En cours de vérif.",
+  UNDER_REVIEW: "En révision",
+  VERIFIED: "Vérifié",
+  APPROVED: "Approuvé",
+  REJECTED: "Rejeté",
+};
+
+function kycBadgeClass(status: string) {
+  switch (status) {
+    case "VERIFIED":
+    case "APPROVED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "REJECTED":
+      return "border-destructive/20 bg-destructive/10 text-destructive";
+    case "SUBMITTED":
+    case "UNDER_REVIEW":
+      return "border-amber-200 bg-amber-50 text-amber-800";
+    default:
+      return "border-border bg-muted text-muted-foreground";
+  }
+}
+
+const DOC_LABELS: Record<string, string> = {
+  CNI: "Carte Nationale d'Identité",
+  PASSPORT: "Passeport",
+  PERMIS: "Permis de conduire",
 };
 
 export default async function ProfilePage() {
@@ -25,8 +62,13 @@ export default async function ProfilePage() {
       createdAt: true,
       kyc: {
         select: {
-          firstName: true, lastName: true, postName: true,
-          docType: true, status: true, submittedAt: true, verifiedAt: true,
+          firstName: true,
+          lastName: true,
+          postName: true,
+          docType: true,
+          status: true,
+          submittedAt: true,
+          verifiedAt: true,
         },
       },
       wallets: { select: { currency: true, balance: true } },
@@ -36,75 +78,122 @@ export default async function ProfilePage() {
 
   if (!user) return null;
 
-  const kycInfo = KYC_STATUS[user.kycStatus] ?? KYC_STATUS.PENDING;
-
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Mon profil</h1>
-        <p className="text-sm text-muted-foreground mt-1">Informations de votre compte ekonzo</p>
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 text-primary">
+          <UserCircleIcon className="size-5" weight="duotone" />
+          <span className="text-xs font-medium uppercase tracking-wide">
+            Compte
+          </span>
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-rdc-navy">
+          Mon profil
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Informations de votre compte ekonzo
+        </p>
       </div>
 
-      {/* Identity card */}
-      <div className="rounded-xl border bg-white overflow-hidden">
-        <div className="flex items-center gap-4 px-6 py-5 border-b bg-slate-50">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white text-xl font-bold flex-shrink-0">
-            {user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+      <Card className="ring-1 ring-rdc-navy/5">
+        <CardHeader className="border-b [.border-b]:pb-4">
+          <div className="flex items-center gap-4">
+            <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
+              {user.name
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2)}
+            </div>
+            <div className="space-y-1">
+              <CardTitle className="text-lg">{user.name}</CardTitle>
+              <Badge
+                variant="outline"
+                className={cn(kycBadgeClass(user.kycStatus))}
+              >
+                {KYC_LABELS[user.kycStatus] ?? user.kycStatus}
+              </Badge>
+            </div>
           </div>
-          <div>
-            <p className="text-lg font-bold">{user.name}</p>
-            <p className={`text-sm font-medium ${kycInfo.color}`}>{kycInfo.icon} {kycInfo.label}</p>
-          </div>
-        </div>
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-3 pt-4 sm:grid-cols-2">
           <Field label="Numéro de téléphone" value={user.phoneNumber ?? "—"} />
           <Field label="Email" value={user.email ?? "—"} />
           <Field label="Membre depuis" value={formatDate(user.createdAt)} />
-          <Field label="Souscriptions" value={`${user._count.subscriptions} au total`} />
-        </div>
-      </div>
+          <Field
+            label="Souscriptions"
+            value={`${user._count.subscriptions} au total`}
+          />
+        </CardContent>
+      </Card>
 
-      {/* KYC details */}
       {user.kyc && (
-        <div className="rounded-xl border bg-white overflow-hidden">
-          <div className="px-6 py-4 border-b bg-slate-50">
-            <p className="font-semibold text-sm">Vérification d&apos;identité (KYC)</p>
-          </div>
-          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card className="ring-1 ring-rdc-navy/5">
+          <CardHeader className="border-b [.border-b]:pb-4">
+            <div className="flex items-center gap-2">
+              <IdentificationCardIcon
+                className="size-5 text-primary"
+                weight="duotone"
+              />
+              <div>
+                <CardTitle className="text-base">
+                  Vérification d&apos;identité (KYC)
+                </CardTitle>
+                <CardDescription>
+                  Informations issues de votre dossier
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-3 pt-4 sm:grid-cols-2">
             <Field label="Prénom" value={user.kyc.firstName} />
             <Field label="Nom" value={user.kyc.lastName} />
-            {user.kyc.postName && <Field label="Post-nom" value={user.kyc.postName} />}
-            <Field label="Type de document" value={DOC_LABELS[user.kyc.docType] ?? user.kyc.docType} />
-            <Field label="Soumis le" value={formatDate(user.kyc.submittedAt)} />
-            {user.kyc.verifiedAt && <Field label="Vérifié le" value={formatDate(user.kyc.verifiedAt)} />}
+            {user.kyc.postName && (
+              <Field label="Post-nom" value={user.kyc.postName} />
+            )}
             <Field
-              label="Statut"
-              value={KYC_STATUS[user.kyc.status]?.label ?? user.kyc.status}
-              highlight={user.kyc.status === "VERIFIED" || user.kyc.status === "APPROVED"}
+              label="Type de document"
+              value={DOC_LABELS[user.kyc.docType] ?? user.kyc.docType}
             />
-          </div>
-        </div>
+            <Field label="Soumis le" value={formatDate(user.kyc.submittedAt)} />
+            {user.kyc.verifiedAt && (
+              <Field label="Vérifié le" value={formatDate(user.kyc.verifiedAt)} />
+            )}
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Statut
+              </p>
+              <Badge
+                variant="outline"
+                className={cn(kycBadgeClass(user.kyc.status))}
+              >
+                {KYC_LABELS[user.kyc.status] ?? user.kyc.status}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Security note */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-muted-foreground">
-        🔒 Pour modifier vos informations personnelles ou votre mot de passe, contactez le support ekonzo.
-      </div>
+      <Alert>
+        <LockIcon className="size-4" />
+        <AlertTitle>Sécurité</AlertTitle>
+        <AlertDescription>
+          Pour modifier vos informations personnelles ou votre mot de passe,
+          contactez le support ekonzo.
+        </AlertDescription>
+      </Alert>
     </div>
   );
 }
 
-const DOC_LABELS: Record<string, string> = {
-  CNI: "Carte Nationale d'Identité",
-  PASSPORT: "Passeport",
-  PERMIS: "Permis de conduire",
-};
-
-function Field({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 px-3 py-3">
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{label}</p>
-      <p className={`text-sm font-semibold mt-0.5 ${highlight ? "text-emerald-600" : ""}`}>{value}</p>
+    <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm font-semibold">{value}</p>
     </div>
   );
 }

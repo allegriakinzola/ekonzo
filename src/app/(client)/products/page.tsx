@@ -1,125 +1,212 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/session";
-import { prisma } from "@/lib/prisma";
+import {
+  IdentificationCardIcon,
+  ListBulletsIcon,
+  WarningCircleIcon,
+} from "@phosphor-icons/react/dist/ssr";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { formatAmount, formatDate, daysUntil } from "@/lib/format";
+import { prisma } from "@/lib/prisma";
+import {
+  getCommittedVolumes,
+  volumeLeft as calcVolumeLeft,
+} from "@/lib/product-volume";
+import { getUserKycStatus, requireRole } from "@/lib/session";
+import { cn } from "@/lib/utils";
 
 export default async function ProductsPage() {
   const session = await requireRole("CLIENT");
-
-  const freshUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { kycStatus: true },
-  });
-  const kycVerified = freshUser?.kycStatus === "VERIFIED";
+  const kycVerified = (await getUserKycStatus(session.user.id)) === "VERIFIED";
 
   const products = await prisma.product.findMany({
-    where: { status: { in: ["OPEN"] } },
+    where: { status: "OPEN" },
     orderBy: { subscriptionDeadline: "asc" },
+    select: {
+      id: true,
+      code: true,
+      currency: true,
+      minTicket: true,
+      discountRate: true,
+      issuanceDate: true,
+      maturityDate: true,
+      subscriptionDeadline: true,
+      totalVolume: true,
+    },
   });
+  const committedMap = await getCommittedVolumes(products.map((p) => p.id));
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Produits disponibles</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Bons du Trésor émis par le Ministère des Finances · RDC
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-primary">
+            <ListBulletsIcon className="size-5" weight="duotone" />
+            <span className="text-xs font-medium uppercase tracking-wide">
+              Marché
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-rdc-navy">
+            Produits disponibles
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Bons du Trésor émis par le Ministère des Finances · RDC
+          </p>
+        </div>
+        <Badge variant="outline" className="h-7 px-3 text-xs">
+          {products.length} produit{products.length > 1 ? "s" : ""}
+        </Badge>
       </div>
 
       {!kycVerified && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
-          <span className="text-lg mt-0.5">🪪</span>
-          <div>
-            <p className="font-semibold text-sm text-amber-800">Vérification d&apos;identité requise</p>
-            <p className="text-xs text-amber-700 mt-0.5">
-              Vous devez compléter votre KYC avant de pouvoir souscrire à un produit.{" "}
-              <Link href="/kyc" className="underline font-medium">Vérifier maintenant →</Link>
-            </p>
-          </div>
-        </div>
+        <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+          <WarningCircleIcon className="size-4 text-amber-700" weight="fill" />
+          <AlertTitle className="text-amber-900">
+            Vérification d&apos;identité requise
+          </AlertTitle>
+          <AlertDescription className="flex flex-col gap-3 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Vous devez compléter votre KYC avant de pouvoir souscrire à un
+              produit.
+            </span>
+            <Button
+              render={<Link href="/kyc" />}
+              size="sm"
+              className="bg-amber-700 text-white hover:bg-amber-800"
+            >
+              <IdentificationCardIcon className="size-4" />
+              Vérifier maintenant
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
 
       {products.length === 0 ? (
-        <div className="rounded-xl border bg-white p-12 text-center">
-          <p className="text-4xl mb-4">📋</p>
-          <p className="font-semibold text-base">Aucun produit ouvert pour le moment</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Les prochaines émissions de Bons du Trésor apparaîtront ici.
-          </p>
-        </div>
+        <Card className="ring-1 ring-rdc-navy/5">
+          <CardContent className="py-16 text-center">
+            <p className="font-semibold text-base">
+              Aucun produit ouvert pour le moment
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Les prochaines émissions de Bons du Trésor apparaîtront ici.
+            </p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           {products.map((p) => {
             const days = daysUntil(p.subscriptionDeadline);
             const rate = p.discountRate;
             const rateLabel = "Taux d'escompte";
-            const volumeLeft = Number(p.totalVolume) - Number(p.allocatedVolume);
-            const pct = Math.round((Number(p.allocatedVolume) / Number(p.totalVolume)) * 100);
+            const committed = committedMap.get(p.id) ?? 0;
+            const volumeLeft = calcVolumeLeft(p.totalVolume.toString(), committed);
+            const pct = Math.round((committed / Number(p.totalVolume)) * 100);
 
             return (
-              <div key={p.id} className="rounded-xl border bg-white overflow-hidden flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b bg-slate-50">
-                  <div className="flex items-center gap-2.5">
-                    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
-                      Bon du Trésor
-                    </span>
-                    <span className="text-xs font-mono text-muted-foreground">{p.code}</span>
+              <Card
+                key={p.id}
+                className="flex flex-col ring-1 ring-rdc-navy/5"
+              >
+                <CardHeader className="border-b [.border-b]:pb-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <Badge
+                        variant="outline"
+                        className="border-primary/20 bg-primary/10 text-primary"
+                      >
+                        Bon du Trésor
+                      </Badge>
+                      <CardDescription className="font-mono">
+                        {p.code}
+                      </CardDescription>
+                    </div>
+                    {days <= 3 ? (
+                      <Badge
+                        variant="outline"
+                        className="border-destructive/20 bg-destructive/10 text-destructive"
+                      >
+                        {days}j restant{days > 1 ? "s" : ""}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {days}j restants
+                      </span>
+                    )}
                   </div>
-                  {days <= 3 ? (
-                    <span className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-full px-2.5 py-0.5">
-                      ⚡ {days}j restant{days > 1 ? "s" : ""}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">{days}j restants</span>
-                  )}
-                </div>
+                  <CardTitle className="text-base sr-only">{p.code}</CardTitle>
+                </CardHeader>
 
-                {/* Body */}
-                <div className="p-5 flex-1 space-y-4">
+                <CardContent className="flex-1 space-y-4 pt-4">
                   <div className="grid grid-cols-2 gap-3">
-                    <Stat label="Valeur nominale" value={formatAmount(p.faceValue.toString(), p.currency)} />
-                    <Stat label="Ticket minimum" value={formatAmount(p.minTicket.toString(), p.currency)} />
-                    <Stat label={rateLabel} value={rate ? `${(Number(rate) * 100).toFixed(2)} %` : "—"} highlight />
-                    <Stat label="Devise" value={p.currency} />
+                    <Stat
+                      label="Montant total"
+                      value={formatAmount(p.totalVolume.toString(), p.currency)}
+                    />
+                    <Stat
+                      label="Ticket minimum"
+                      value={formatAmount(p.minTicket.toString(), p.currency)}
+                    />
+                    <Stat
+                      label={rateLabel}
+                      value={
+                        rate ? `${(Number(rate) * 100).toFixed(2)} %` : "—"
+                      }
+                      highlight
+                    />
+                    <Stat
+                      label="Disponible"
+                      value={formatAmount(volumeLeft.toString(), p.currency)}
+                    />
                     <Stat label="Émission" value={formatDate(p.issuanceDate)} />
                     <Stat label="Maturité" value={formatDate(p.maturityDate)} />
                   </div>
 
-                  {/* Volume bar */}
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs text-muted-foreground">Volume disponible</span>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        Volume disponible
+                      </span>
                       <span className="text-xs font-medium">{pct}% alloué</span>
                     </div>
-                    <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                      <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+                    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {formatAmount(volumeLeft.toString(), p.currency)} disponibles
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatAmount(volumeLeft.toString(), p.currency)}{" "}
+                      disponibles
                     </p>
                   </div>
-                </div>
+                </CardContent>
 
-                {/* Footer */}
-                <div className="px-5 pb-5">
+                <CardFooter>
                   {kycVerified ? (
-                    <Link
-                      href={`/products/${p.id}`}
-                      className="flex items-center justify-center w-full h-10 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors"
+                    <Button
+                      className="w-full"
+                      size="lg"
+                      render={<Link href={`/products/${p.id}`} />}
                     >
-                      Souscrire →
-                    </Link>
+                      Souscrire
+                    </Button>
                   ) : (
-                    <button
-                      disabled
-                      className="w-full h-10 rounded-lg bg-slate-100 text-muted-foreground text-sm font-medium cursor-not-allowed"
-                    >
+                    <Button className="w-full" size="lg" disabled>
                       KYC requis pour souscrire
-                    </button>
+                    </Button>
                   )}
-                </div>
-              </div>
+                </CardFooter>
+              </Card>
             );
           })}
         </div>
@@ -128,11 +215,28 @@ export default async function ProductsPage() {
   );
 }
 
-function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function Stat({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
   return (
-    <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{label}</p>
-      <p className={`text-sm font-semibold mt-0.5 ${highlight ? "text-primary" : ""}`}>{value}</p>
+    <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-0.5 text-sm font-semibold",
+          highlight && "text-primary",
+        )}
+      >
+        {value}
+      </p>
     </div>
   );
 }

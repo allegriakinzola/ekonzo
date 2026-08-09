@@ -10,12 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
+import {
+  isValidMomoPhone,
+  MOMO_PHONE_ERROR,
+  normalizeMomoPhone,
+} from "@/modules/payments/phone";
 
 const loginSchema = z.object({
   phoneNumber: z
     .string()
-    .min(9, "Numéro invalide")
-    .regex(/^[0-9+]+$/, "Chiffres uniquement"),
+    .transform((v) => normalizeMomoPhone(v))
+    .refine(isValidMomoPhone, MOMO_PHONE_ERROR),
   password: z.string().min(1, "Mot de passe requis"),
 });
 
@@ -99,11 +104,16 @@ export default function LoginPage() {
               <Label htmlFor="phone">Numéro de téléphone</Label>
               <Input
                 id="phone"
-                placeholder="+243 812 345 678"
+                placeholder="812345678"
                 type="tel"
+                inputMode="numeric"
+                maxLength={9}
                 className="h-11"
                 {...form.register("phoneNumber")}
               />
+              <p className="text-xs text-muted-foreground">
+                9 chiffres, sans 0 ni +243
+              </p>
               {form.formState.errors.phoneNumber && (
                 <p className="text-xs text-destructive">
                   {form.formState.errors.phoneNumber.message}

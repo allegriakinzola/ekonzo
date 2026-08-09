@@ -1,42 +1,120 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  BankIcon,
+  CheckCircleIcon,
+  DeviceMobileIcon,
+  LockIcon,
+  SpinnerGapIcon,
+  WarningCircleIcon,
+} from "@phosphor-icons/react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 interface Product {
   id: string;
   type: string;
   currency: string;
-  faceValue: string;
   minTicket: string;
+  volumeLeft: string;
   discountRate: string | null;
   couponRate: string | null;
 }
 
-const MOMO_OPERATORS = [
-  { value: "AIRTEL", label: "Airtel Money" },
-  { value: "ORANGE", label: "Orange Money" },
-  { value: "MPESA", label: "M-Pesa" },
-];
+type PayPhase =
+  | "form"
+  | "awaiting_ussd"
+  | "confirmed"
+  | "failed"
+  | "bank_pending";
 
-export function SubscribeForm({ product }: { product: Product }) {
+export function SubscribeForm({
+  product,
+  accountPhone,
+}: {
+  product: Product;
+  accountPhone: string;
+}) {
   const router = useRouter();
-  const [channel, setChannel] = useState<"MOBILE_MONEY" | "BANK_TRANSFER">("MOBILE_MONEY");
+  const [channel, setChannel] = useState<"MOBILE_MONEY" | "BANK_TRANSFER">(
+    "MOBILE_MONEY",
+  );
   const [amount, setAmount] = useState("");
-  const [momoOperator, setMomoOperator] = useState("AIRTEL");
-  const [momoPhone, setMomoPhone] = useState("");
   const [bankName, setBankName] = useState("");
   const [bankAccount, setBankAccount] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-  const [momoPromptSent, setMomoPromptSent] = useState(false);
+  const [phase, setPhase] = useState<PayPhase>("form");
+  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+  const [pollCount, setPollCount] = useState(0);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const minTicket = Number(product.minTicket);
-  const faceValue = Number(product.faceValue);
+  const volumeLeft = Number(product.volumeLeft);
   const amountNum = parseFloat(amount) || 0;
-  const units = amountNum >= faceValue ? Math.floor(amountNum / faceValue) : 0;
-  const valid = amountNum >= minTicket && units >= 1;
+  const valid =
+    amountNum >= minTicket && amountNum <= volumeLeft && volumeLeft > 0;
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  function startPolling(subId: string) {
+    setSubscriptionId(subId);
+    setPhase("awaiting_ussd");
+    setPollCount(0);
+
+    if (pollRef.current) clearInterval(pollRef.current);
+
+    pollRef.current = setInterval(async () => {
+      setPollCount((c) => c + 1);
+      try {
+        const res = await fetch(
+          `/api/subscriptions/${subId}/payment-status`,
+        );
+        if (!res.ok) return;
+        const json = (await res.json()) as { status?: string };
+        if (json.status === "SUCCESS") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setPhase("confirmed");
+          setTimeout(() => router.push("/portfolio"), 2500);
+        } else if (json.status === "FAILED" || json.status === "CANCELLED") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setPhase("failed");
+          setError(
+            json.status === "CANCELLED"
+              ? "Paiement annulé sur le menu USSD."
+              : "Paiement refusé. Réessayez plus tard.",
+          );
+        }
+      } catch {
+        // ignore transient network errors during poll
+      }
+    }, 4000);
+
+    // Arrêt après ~3 min
+    setTimeout(() => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    }, 180_000);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,219 +129,326 @@ export function SubscribeForm({ product }: { product: Product }) {
           productId: product.id,
           amount: amountNum,
           paymentChannel: channel,
-          ...(channel === "MOBILE_MONEY" ? { momoOperator, momoPhone } : { bankName, bankAccount }),
+          ...(channel === "MOBILE_MONEY" ? {} : { bankName, bankAccount }),
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
-      setMomoPromptSent(json.momoPromptSent === true);
-      setSuccess(true);
-      setTimeout(() => router.push("/portfolio"), 4000);
+      if (!res.ok) throw new Error(json.error ?? "Erreur lors de la souscription.");
+
+      if (channel === "MOBILE_MONEY") {
+        if (!accountPhone) {
+          throw new Error(
+            "Aucun numéro de téléphone sur votre compte. Mettez à jour votre profil.",
+          );
+        }
+        if (!json.momoPromptSent || !json.id) {
+          throw new Error(
+            json.error ?? "Le prompt USSD n’a pas pu être envoyé.",
+          );
+        }
+        startPolling(json.id as string);
+      } else {
+        setPhase("bank_pending");
+        setTimeout(() => router.push("/portfolio"), 4000);
+      }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erreur lors de la souscription.");
+      setError(
+        err instanceof Error ? err.message : "Erreur lors de la souscription.",
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  if (success) {
+  if (phase === "awaiting_ussd" || phase === "confirmed" || phase === "failed") {
     return (
-      <div className="rounded-xl border bg-white p-8 text-center space-y-4">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl">✅</div>
-        <div>
-          <h3 className="text-lg font-bold">Souscription enregistrée !</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            Votre demande est en attente de confirmation du paiement.
-          </p>
-        </div>
-        <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-left text-sm text-blue-800">
-          {channel === "BANK_TRANSFER" ? (
-            <>
-              <p className="font-semibold">Effectuez le virement bancaire</p>
-              <p className="text-xs mt-1 text-blue-700">
-                Envoyez <strong>{amountNum.toLocaleString("fr-CD")} {product.currency}</strong> vers le compte du Trésor Public et conservez votre reçu.
-              </p>
-            </>
-          ) : (
-            <>
-              {momoPromptSent ? (
-                <>
-                  <p className="font-semibold">✅ Prompt USSD envoyé !</p>
-                  <p className="text-xs mt-1 text-blue-700">
-                    Vérifiez votre téléphone <strong>{momoPhone}</strong> et confirmez le paiement de{" "}
-                    <strong>{amountNum.toLocaleString("fr-CD")} {product.currency}</strong> sur votre menu Mobile Money.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="font-semibold">Confirmez le paiement Mobile Money</p>
-                  <p className="text-xs mt-1 text-blue-700">
-                    Composez le code USSD de votre opérateur pour payer{" "}
-                    <strong>{amountNum.toLocaleString("fr-CD")} {product.currency}</strong> depuis <strong>{momoPhone}</strong>.
-                  </p>
-                </>
-              )}
-            </>
+      <Card className="ring-1 ring-rdc-navy/5">
+        <CardContent className="space-y-4 py-8 text-center">
+          <div
+            className={cn(
+              "mx-auto flex size-16 items-center justify-center rounded-full ring-1",
+              phase === "confirmed" &&
+                "bg-emerald-50 text-emerald-700 ring-emerald-100",
+              phase === "failed" &&
+                "bg-destructive/10 text-destructive ring-destructive/20",
+              phase === "awaiting_ussd" &&
+                "bg-primary/10 text-primary ring-primary/20",
+            )}
+          >
+            {phase === "awaiting_ussd" ? (
+              <SpinnerGapIcon className="size-8 animate-spin" weight="bold" />
+            ) : phase === "confirmed" ? (
+              <CheckCircleIcon className="size-8" weight="fill" />
+            ) : (
+              <WarningCircleIcon className="size-8" weight="fill" />
+            )}
+          </div>
+
+          <div>
+            <h3 className="text-lg font-bold text-rdc-navy">
+              {phase === "awaiting_ussd" && "Confirmez sur votre téléphone"}
+              {phase === "confirmed" && "Paiement confirmé"}
+              {phase === "failed" && "Paiement non abouti"}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {phase === "awaiting_ussd" &&
+                "Un menu USSD / notification Mobile Money a été envoyé."}
+              {phase === "confirmed" &&
+                "Votre souscription est enregistrée. Redirection…"}
+              {phase === "failed" && error}
+            </p>
+          </div>
+
+          {phase === "awaiting_ussd" && (
+            <Alert className="border-primary/20 bg-primary/5 text-left text-primary">
+              <DeviceMobileIcon className="size-4" weight="fill" />
+              <AlertTitle>Prompt USSD envoyé</AlertTitle>
+              <AlertDescription className="text-primary/80">
+                Sur <strong>{accountPhone}</strong>, validez le paiement de{" "}
+                <strong>
+                  {amountNum.toLocaleString("fr-CD")} {product.currency}
+                </strong>{" "}
+                avec votre code PIN Mobile Money.
+                <span className="mt-2 block text-xs opacity-80">
+                  En attente de confirmation
+                  {pollCount > 0 ? ` (${pollCount})` : "…"}
+                  {subscriptionId ? ` · réf. ${subscriptionId.slice(0, 8)}` : ""}
+                </span>
+              </AlertDescription>
+            </Alert>
           )}
-        </div>
-        <p className="text-xs text-muted-foreground">Redirection vers votre portefeuille…</p>
-      </div>
+
+          {phase === "failed" && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setPhase("form");
+                setError("");
+              }}
+            >
+              Réessayer
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (phase === "bank_pending") {
+    return (
+      <Card className="ring-1 ring-rdc-navy/5">
+        <CardContent className="space-y-4 py-8 text-center">
+          <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+            <CheckCircleIcon className="size-8" weight="fill" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-rdc-navy">
+              Souscription enregistrée
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Effectuez le virement puis conservez votre reçu.
+            </p>
+          </div>
+          <Alert className="border-primary/20 bg-primary/5 text-left text-primary">
+            <AlertTitle>Virement bancaire</AlertTitle>
+            <AlertDescription className="text-primary/80">
+              Envoyez{" "}
+              <strong>
+                {amountNum.toLocaleString("fr-CD")} {product.currency}
+              </strong>{" "}
+              vers le compte du Trésor Public.
+            </AlertDescription>
+          </Alert>
+          <p className="text-xs text-muted-foreground">
+            Redirection vers votre portefeuille…
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border bg-white overflow-hidden">
-      <div className="px-5 py-4 border-b bg-slate-50">
-        <p className="font-semibold text-sm">Formulaire de souscription</p>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          1 titre = {faceValue.toLocaleString("fr-CD")} {product.currency} · Ticket minimum : {minTicket.toLocaleString("fr-CD")} {product.currency}
-          {faceValue > minTicket && (
-            <span className="text-amber-600 font-medium"> · Montant effectif min : {faceValue.toLocaleString("fr-CD")} {product.currency}</span>
-          )}
-        </p>
-      </div>
+    <Card className="ring-1 ring-rdc-navy/5">
+      <CardHeader className="border-b [.border-b]:pb-4">
+        <CardTitle className="text-base">Formulaire de souscription</CardTitle>
+        <CardDescription>
+          Minimum {minTicket.toLocaleString("fr-CD")} {product.currency} ·{" "}
+          Disponible {volumeLeft.toLocaleString("fr-CD")} {product.currency}.
+          Vous pouvez souscrire n&apos;importe quel montant dans cet intervalle.
+        </CardDescription>
+      </CardHeader>
 
-      <div className="p-5 space-y-5">
-        {/* Amount */}
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">Montant à investir ({product.currency})</label>
-          <div className="relative">
-            <input
-              type="number"
-              min={minTicket}
-              step={faceValue}
-              placeholder={minTicket.toString()}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-full h-11 rounded-lg border border-input bg-background pl-3 pr-20 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-              required
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-              {product.currency}
-            </span>
-          </div>
-          {amountNum > 0 && (
-            <p className={`text-xs ${valid ? "text-emerald-600" : "text-red-500"}`}>
-              {units >= 1
-                ? `→ ${units} titre${units > 1 ? "s" : ""} · ${(amountNum - units * faceValue).toLocaleString("fr-CD")} ${product.currency} de reste`
-                : amountNum < minTicket
-                  ? `Minimum requis : ${minTicket.toLocaleString("fr-CD")} ${product.currency}`
-                  : `Montant insuffisant — il faut au moins ${faceValue.toLocaleString("fr-CD")} ${product.currency} pour acquérir 1 titre`}
-            </p>
-          )}
-        </div>
-
-        {/* Payment channel */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Mode de paiement</label>
-          <div className="grid grid-cols-2 gap-3">
-            {(["MOBILE_MONEY", "BANK_TRANSFER"] as const).map((ch) => (
-              <button
-                key={ch}
-                type="button"
-                onClick={() => setChannel(ch)}
-                className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-4 text-sm font-medium transition-all ${
-                  channel === ch ? "border-primary bg-primary/5" : "border-slate-200 hover:border-slate-300"
-                }`}
+      <CardContent className="pt-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-1.5">
+            <Label htmlFor="amount">
+              Montant à investir ({product.currency})
+            </Label>
+            <div className="relative">
+              <Input
+                id="amount"
+                type="number"
+                min={minTicket}
+                max={volumeLeft}
+                step="any"
+                placeholder={minTicket.toString()}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="h-11 pr-16"
+                required
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+                {product.currency}
+              </span>
+            </div>
+            {amountNum > 0 && (
+              <p
+                className={cn(
+                  "text-xs",
+                  valid ? "text-emerald-600" : "text-destructive",
+                )}
               >
-                <span className="text-xl">{ch === "MOBILE_MONEY" ? "📱" : "🏦"}</span>
-                <span>{ch === "MOBILE_MONEY" ? "Mobile Money" : "Virement bancaire"}</span>
-              </button>
-            ))}
+                {amountNum < minTicket
+                  ? `Minimum requis : ${minTicket.toLocaleString("fr-CD")} ${product.currency}`
+                  : amountNum > volumeLeft
+                    ? `Maximum disponible : ${volumeLeft.toLocaleString("fr-CD")} ${product.currency}`
+                    : `Montant accepté : ${amountNum.toLocaleString("fr-CD")} ${product.currency}`}
+              </p>
+            )}
           </div>
-        </div>
 
-        {/* Mobile Money fields */}
-        {channel === "MOBILE_MONEY" && (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Opérateur</label>
-              <div className="grid grid-cols-3 gap-2">
-                {MOMO_OPERATORS.map((op) => (
+          <div className="space-y-2">
+            <Label>Mode de paiement</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {(
+                [
+                  {
+                    value: "MOBILE_MONEY" as const,
+                    label: "Mobile Money",
+                    icon: DeviceMobileIcon,
+                  },
+                  {
+                    value: "BANK_TRANSFER" as const,
+                    label: "Virement bancaire",
+                    icon: BankIcon,
+                  },
+                ] as const
+              ).map((ch) => {
+                const Icon = ch.icon;
+                return (
                   <button
-                    key={op.value}
+                    key={ch.value}
                     type="button"
-                    onClick={() => setMomoOperator(op.value)}
-                    className={`rounded-lg border-2 py-2 text-xs font-medium transition-all ${
-                      momoOperator === op.value ? "border-primary bg-primary/5 text-primary" : "border-slate-200 hover:border-slate-300"
-                    }`}
+                    onClick={() => setChannel(ch.value)}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-xl border-2 p-4 text-sm font-medium transition-all",
+                      channel === ch.value
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-muted-foreground/30",
+                    )}
                   >
-                    {op.label}
+                    <Icon className="size-5" weight="duotone" />
+                    <span>{ch.label}</span>
                   </button>
-                ))}
+                );
+              })}
+            </div>
+          </div>
+
+          {channel === "MOBILE_MONEY" && (
+            <div className="space-y-1.5">
+              <Label>Numéro Mobile Money</Label>
+              <div className="flex h-11 items-center rounded-lg border border-border bg-muted/50 px-3 text-sm font-medium">
+                {accountPhone || "—"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Numéro de votre compte — EasyPay enverra le prompt USSD sur ce
+                numéro (l’opérateur est détecté automatiquement).
+                {accountPhone
+                  ? ""
+                  : " Aucun numéro trouvé : reconnectez-vous ou contactez le support."}
+              </p>
+            </div>
+          )}
+
+          {channel === "BANK_TRANSFER" && (
+            <div className="space-y-4">
+              <div className="space-y-1 rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">
+                  Coordonnées bancaires du Trésor Public
+                </p>
+                <p>
+                  Banque : <strong>Banque Centrale du Congo (BCC)</strong>
+                </p>
+                <p>
+                  Compte : <strong>CD12 3456 7890 1234 5678</strong>
+                </p>
+                <p>
+                  Référence :{" "}
+                  <strong>EKONZO-{Date.now().toString().slice(-8)}</strong>
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bankName">Votre banque</Label>
+                <Input
+                  id="bankName"
+                  placeholder="Ex : Rawbank, Equity BCDC…"
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  className="h-11"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bankAccount">Votre numéro de compte</Label>
+                <Input
+                  id="bankAccount"
+                  placeholder="Ex : 123456789"
+                  value={bankAccount}
+                  onChange={(e) => setBankAccount(e.target.value)}
+                  className="h-11"
+                  required
+                />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Numéro Mobile Money</label>
-              <input
-                type="tel"
-                placeholder="+243 8X XXX XXXX"
-                value={momoPhone}
-                onChange={(e) => setMomoPhone(e.target.value)}
-                className="w-full h-11 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                required
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Bank Transfer fields */}
-        {channel === "BANK_TRANSFER" && (
-          <div className="space-y-4">
-            <div className="rounded-lg bg-slate-50 border p-3 text-xs text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground">Coordonnées bancaires du Trésor Public</p>
-              <p>Banque : <strong>Banque Centrale du Congo (BCC)</strong></p>
-              <p>Compte : <strong>CD12 3456 7890 1234 5678</strong></p>
-              <p>Référence : <strong>EKONZO-{Date.now().toString().slice(-8)}</strong></p>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Votre banque</label>
-              <input
-                placeholder="Ex : Rawbank, Equity BCDC…"
-                value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
-                className="w-full h-11 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Votre numéro de compte</label>
-              <input
-                placeholder="Ex : 123456789"
-                value={bankAccount}
-                onChange={(e) => setBankAccount(e.target.value)}
-                className="w-full h-11 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                required
-              />
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2">
-            <span>⚠️</span> {error}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading || !valid || amountNum === 0}
-          className="w-full h-11 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        >
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Traitement en cours…
-            </span>
-          ) : (
-            `Confirmer la souscription de ${amountNum > 0 ? amountNum.toLocaleString("fr-CD") : "—"} ${product.currency}`
           )}
-        </button>
 
-        <p className="text-xs text-center text-muted-foreground">
-          🔒 Votre souscription est traitée conformément à la réglementation de la BCC.
-        </p>
-      </div>
-    </form>
+          {error && (
+            <Alert variant="destructive">
+              <WarningCircleIcon className="size-4" weight="fill" />
+              <AlertTitle>Erreur</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <Button
+            type="submit"
+            className="h-11 w-full"
+            size="lg"
+            disabled={
+              loading ||
+              !valid ||
+              amountNum === 0 ||
+              (channel === "MOBILE_MONEY" && !accountPhone)
+            }
+          >
+            {loading
+              ? channel === "MOBILE_MONEY"
+                ? "Envoi du prompt USSD…"
+                : "Traitement en cours…"
+              : channel === "MOBILE_MONEY"
+                ? `Payer ${amountNum > 0 ? amountNum.toLocaleString("fr-CD") : "—"} ${product.currency} par Mobile Money`
+                : `Confirmer la souscription de ${amountNum > 0 ? amountNum.toLocaleString("fr-CD") : "—"} ${product.currency}`}
+          </Button>
+
+          <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+            <LockIcon className="size-3.5" />
+            Paiement sécurisé via EasyPay · réglementation BCC
+          </p>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

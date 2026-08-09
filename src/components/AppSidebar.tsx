@@ -138,7 +138,8 @@ export function AppSidebar({
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-64 fixed inset-y-0 left-0 border-r bg-white z-30">
+      <aside className="hidden lg:flex flex-col w-64 fixed inset-y-0 left-0 z-30 border-r border-border bg-card shadow-sm">
+        <div className="h-1 w-full bg-[linear-gradient(90deg,var(--rdc-red)_0%,var(--primary)_45%,var(--rdc-navy)_100%)]" />
         {sidebarContent}
       </aside>
 

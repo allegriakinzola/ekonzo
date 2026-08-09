@@ -2,7 +2,43 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  CheckCircleIcon,
+  CreditCardIcon,
+  ListBulletsIcon,
+} from "@phosphor-icons/react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatAmount, formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 interface Subscription {
   id: string;
@@ -19,46 +55,55 @@ interface Subscription {
   bankAccount: { bankName: string; accountNumber: string } | null;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  PENDING_PAYMENT:       "bg-amber-100 text-amber-700",
-  PAYMENT_CONFIRMED:     "bg-blue-100 text-blue-700",
-  SUBMITTED:             "bg-indigo-100 text-indigo-700",
-  ADJUDICATED:           "bg-emerald-100 text-emerald-700",
-  PARTIALLY_ADJUDICATED: "bg-yellow-100 text-yellow-700",
-  ACTIVE:                "bg-emerald-100 text-emerald-700",
-  REIMBURSED:            "bg-slate-100 text-slate-600",
-  CANCELLED:             "bg-red-100 text-red-600",
-  FAILED:                "bg-red-100 text-red-600",
-};
-
 const STATUS_LABELS: Record<string, string> = {
-  PENDING_PAYMENT:       "Paiement attendu",
-  PAYMENT_CONFIRMED:     "Paiement confirmé",
-  SUBMITTED:             "Soumis",
-  ADJUDICATED:           "Adjugé",
+  PENDING_PAYMENT: "Paiement attendu",
+  PAYMENT_CONFIRMED: "Paiement confirmé",
+  SUBMITTED: "Soumis",
+  ADJUDICATED: "Adjugé",
   PARTIALLY_ADJUDICATED: "Partiellement adjugé",
-  ACTIVE:                "Actif",
-  REIMBURSED:            "Remboursé",
-  CANCELLED:             "Annulé",
-  FAILED:                "Échoué",
+  ACTIVE: "Actif",
+  REIMBURSED: "Remboursé",
+  CANCELLED: "Annulé",
+  FAILED: "Échoué",
 };
 
 const FILTER_TABS = [
-  { value: "", label: "Toutes" },
+  { value: "ALL", label: "Toutes" },
   { value: "PENDING_PAYMENT", label: "En attente" },
   { value: "PAYMENT_CONFIRMED", label: "Paiement confirmé" },
   { value: "SUBMITTED", label: "Soumis" },
   { value: "ADJUDICATED", label: "Adjugés" },
-];
+] as const;
+
+function statusBadgeClass(status: string) {
+  switch (status) {
+    case "ADJUDICATED":
+    case "ACTIVE":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "PAYMENT_CONFIRMED":
+      return "border-primary/20 bg-primary/10 text-primary";
+    case "SUBMITTED":
+      return "border-rdc-navy/20 bg-rdc-navy/10 text-rdc-navy";
+    case "PENDING_PAYMENT":
+    case "PARTIALLY_ADJUDICATED":
+      return "border-amber-200 bg-amber-50 text-amber-800";
+    case "CANCELLED":
+    case "FAILED":
+      return "border-destructive/20 bg-destructive/10 text-destructive";
+    default:
+      return "border-border bg-muted text-muted-foreground";
+  }
+}
 
 export function SubscriptionsManager({ initial }: { initial: Subscription[] }) {
   const router = useRouter();
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useState("ALL");
   const [acting, setActing] = useState<string | null>(null);
   const [selected, setSelected] = useState<Subscription | null>(null);
   const [adjForm, setAdjForm] = useState({ amount: "", rate: "" });
 
-  const displayed = filter ? initial.filter((s) => s.status === filter) : initial;
+  const displayed =
+    filter === "ALL" ? initial : initial.filter((s) => s.status === filter);
 
   async function doAction(id: string, action: string, extra?: object) {
     setActing(id);
@@ -73,170 +118,331 @@ export function SubscriptionsManager({ initial }: { initial: Subscription[] }) {
   }
 
   return (
-    <>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Souscriptions</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gestion des dossiers de souscription</p>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-primary">
+            <ListBulletsIcon className="size-5" weight="duotone" />
+            <span className="text-xs font-medium uppercase tracking-wide">
+              Opérations
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-rdc-navy">
+            Souscriptions
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Gestion des dossiers de souscription aux Bons du Trésor
+          </p>
         </div>
+        <Badge variant="outline" className="h-7 px-3 text-xs">
+          {displayed.length} dossier{displayed.length > 1 ? "s" : ""}
+        </Badge>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
-        {FILTER_TABS.map((t) => (
-          <button key={t.value} onClick={() => setFilter(t.value)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
-              filter === t.value ? "bg-primary text-white" : "border hover:bg-slate-50"
-            }`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Card className="border-border/80 bg-card shadow-sm ring-1 ring-rdc-navy/5">
+        <CardHeader className="border-b [.border-b]:pb-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle className="text-base">Dossiers</CardTitle>
+              <CardDescription>
+                Filtrez par statut, puis gérez chaque souscription
+              </CardDescription>
+            </div>
+            <Tabs
+              value={filter}
+              onValueChange={(value) => {
+                if (typeof value === "string") setFilter(value);
+              }}
+            >
+              <TabsList className="h-9 w-full flex-wrap lg:w-auto">
+                {FILTER_TABS.map((tab) => (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className="px-3 data-active:bg-primary data-active:text-primary-foreground"
+                  >
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
+        </CardHeader>
 
-      {displayed.length === 0 ? (
-        <div className="rounded-xl border bg-white p-12 text-center text-sm text-muted-foreground">Aucune souscription.</div>
-      ) : (
-        <div className="rounded-xl border bg-white overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-slate-50 text-xs text-muted-foreground uppercase tracking-wide">
-                  <th className="text-left px-4 py-3 font-medium">Investisseur</th>
-                  <th className="text-left px-4 py-3 font-medium">Produit</th>
-                  <th className="text-left px-4 py-3 font-medium">Montant</th>
-                  <th className="text-left px-4 py-3 font-medium">Canal</th>
-                  <th className="text-left px-4 py-3 font-medium">Statut</th>
-                  <th className="text-left px-4 py-3 font-medium">Date</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
+        <CardContent className="p-0">
+          {displayed.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+              <CreditCardIcon
+                className="size-10 text-primary/50"
+                weight="duotone"
+              />
+              <p className="text-sm font-medium">Aucune souscription</p>
+              <p className="text-xs text-muted-foreground">
+                Les nouvelles demandes apparaîtront ici.
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="px-4">Investisseur</TableHead>
+                  <TableHead className="px-4">Produit</TableHead>
+                  <TableHead className="px-4">Montant</TableHead>
+                  <TableHead className="px-4">Canal</TableHead>
+                  <TableHead className="px-4">Statut</TableHead>
+                  <TableHead className="px-4">Date</TableHead>
+                  <TableHead className="px-4 text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {displayed.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="font-medium">{s.user.name}</p>
-                      <p className="text-xs text-muted-foreground">{s.user.phoneNumber ?? "—"}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold mr-1 ${
-                        s.product.type === "BT" ? "bg-blue-100 text-blue-700" : "bg-violet-100 text-violet-700"
-                      }`}>{s.product.type}</span>
+                  <TableRow key={s.id}>
+                    <TableCell className="px-4 py-3 whitespace-normal">
+                      <p className="text-sm font-medium">{s.user.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {s.user.phoneNumber ?? "—"}
+                      </p>
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <Badge
+                        variant="outline"
+                        className="mr-1 border-primary/20 bg-primary/10 text-primary"
+                      >
+                        BT
+                      </Badge>
                       <span className="font-mono text-xs">{s.product.code}</span>
-                    </td>
-                    <td className="px-4 py-3 font-medium">{formatAmount(s.amount, s.currency)}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="px-4 py-3 font-medium">
+                      {formatAmount(s.amount, s.currency)}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 whitespace-normal text-muted-foreground">
                       {s.paymentChannel === "MOBILE_MONEY"
                         ? `${s.momoAccount?.operator ?? "MoMo"} · ${s.momoAccount?.phoneNumber ?? ""}`
                         : `Virement · ${s.bankAccount?.bankName ?? ""}`}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[s.status] ?? ""}`}>
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "",
+                          statusBadgeClass(s.status),
+                        )}
+                      >
                         {STATUS_LABELS[s.status] ?? s.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(s.createdAt)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button onClick={() => { setSelected(s); setAdjForm({ amount: s.amount, rate: "" }); }}
-                        className="rounded-lg border px-3 py-1 text-xs font-medium hover:bg-slate-100 transition-colors">
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-muted-foreground">
+                      {formatDate(s.createdAt)}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelected(s);
+                          setAdjForm({ amount: s.amount, rate: "" });
+                        }}
+                      >
                         Gérer
-                      </button>
-                    </td>
-                  </tr>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Detail modal */}
-      {selected && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-5 border-b">
-              <div>
-                <h2 className="font-bold text-base">{selected.user.name}</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">{selected.product.type} · {selected.product.code}</p>
-              </div>
-              <button onClick={() => setSelected(null)} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-muted-foreground transition-colors text-lg">✕</button>
-            </div>
+      <Dialog
+        open={!!selected}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg" showCloseButton>
+          {selected && (
+            <>
+              <DialogHeader className="border-b border-border pb-4 pr-8">
+                <DialogTitle className="text-base text-rdc-navy">
+                  {selected.user.name}
+                </DialogTitle>
+                <DialogDescription>
+                  {selected.product.type} · {selected.product.code}
+                </DialogDescription>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "mt-2 w-fit ",
+                    statusBadgeClass(selected.status),
+                  )}
+                >
+                  {STATUS_LABELS[selected.status] ?? selected.status}
+                </Badge>
+              </DialogHeader>
 
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  ["Montant", formatAmount(selected.amount, selected.currency)],
-                  ["Titres", selected.units.toString()],
-                  ["Canal", selected.paymentChannel === "MOBILE_MONEY" ? "Mobile Money" : "Virement bancaire"],
-                  ["Statut", STATUS_LABELS[selected.status] ?? selected.status],
-                  ...(selected.momoAccount ? [
-                    ["Opérateur", selected.momoAccount.operator],
-                    ["N° MoMo", selected.momoAccount.phoneNumber],
-                  ] : []),
-                  ...(selected.bankAccount ? [
-                    ["Banque", selected.bankAccount.bankName],
-                    ["Compte", selected.bankAccount.accountNumber],
-                  ] : []),
-                  ...(selected.bankTransferRef ? [["Réf. virement", selected.bankTransferRef]] : []),
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg bg-slate-50 px-3 py-2.5">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{label}</p>
-                    <p className="text-sm font-semibold mt-0.5 break-all">{value}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Actions */}
-              <div className="space-y-2 pt-2 border-t">
-                {selected.status === "PENDING_PAYMENT" && (
-                  <button onClick={() => doAction(selected.id, "confirm_payment")} disabled={acting === selected.id}
-                    className="w-full h-10 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                    {acting === selected.id ? "…" : "✓ Confirmer le paiement"}
-                  </button>
-                )}
-                {selected.status === "PAYMENT_CONFIRMED" && (
-                  <button onClick={() => doAction(selected.id, "submit")} disabled={acting === selected.id}
-                    className="w-full h-10 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                    {acting === selected.id ? "…" : "Marquer comme soumis"}
-                  </button>
-                )}
-                {selected.status === "SUBMITTED" && (
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-muted-foreground">Montant adjugé</label>
-                        <input type="number" placeholder={selected.amount} value={adjForm.amount}
-                          onChange={(e) => setAdjForm((f) => ({ ...f, amount: e.target.value }))}
-                          className="w-full h-9 rounded-lg border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-muted-foreground">Taux adjugé (%)</label>
-                        <input type="number" step="0.01" placeholder="12.50" value={adjForm.rate}
-                          onChange={(e) => setAdjForm((f) => ({ ...f, rate: e.target.value }))}
-                          className="w-full h-9 rounded-lg border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
-                      </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      [
+                        "Montant",
+                        formatAmount(selected.amount, selected.currency),
+                      ],
+                      [
+                        "Canal",
+                        selected.paymentChannel === "MOBILE_MONEY"
+                          ? "Mobile Money"
+                          : "Virement bancaire",
+                      ],
+                      [
+                        "Statut",
+                        STATUS_LABELS[selected.status] ?? selected.status,
+                      ],
+                      ...(selected.momoAccount
+                        ? ([
+                          ["Opérateur", selected.momoAccount.operator],
+                          ["N° MoMo", selected.momoAccount.phoneNumber],
+                        ] as const)
+                        : []),
+                      ...(selected.bankAccount
+                        ? ([
+                          ["Banque", selected.bankAccount.bankName],
+                          ["Compte", selected.bankAccount.accountNumber],
+                        ] as const)
+                        : []),
+                      ...(selected.bankTransferRef
+                        ? ([
+                          ["Réf. virement", selected.bankTransferRef],
+                        ] as const)
+                        : []),
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="rounded-lg border border-border bg-muted/50 px-3 py-2.5"
+                    >
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {label}
+                      </p>
+                      <p className="mt-0.5 break-all text-sm font-semibold">
+                        {value}
+                      </p>
                     </div>
-                    <button
-                      onClick={() => doAction(selected.id, "adjudicate", {
-                        adjudicatedAmount: parseFloat(adjForm.amount),
-                        adjudicatedRate: parseFloat(adjForm.rate) / 100,
-                      })}
-                      disabled={acting === selected.id || !adjForm.amount || !adjForm.rate}
-                      className="w-full h-10 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors">
-                      {acting === selected.id ? "…" : "Adjuger"}
-                    </button>
-                  </div>
-                )}
-                {!["CANCELLED", "FAILED", "REIMBURSED", "ADJUDICATED", "ACTIVE", "MATURED"].includes(selected.status) && (
-                  <button onClick={() => doAction(selected.id, "cancel")} disabled={acting === selected.id}
-                    className="w-full h-10 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors">
-                    {acting === selected.id ? "…" : "Annuler la souscription"}
-                  </button>
-                )}
+                  ))}
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  {selected.status === "PENDING_PAYMENT" && (
+                    <Button
+                      className="w-full"
+                      disabled={acting === selected.id}
+                      onClick={() => doAction(selected.id, "confirm_payment")}
+                    >
+                      <CheckCircleIcon weight="bold" />
+                      {acting === selected.id
+                        ? "…"
+                        : "Confirmer le paiement"}
+                    </Button>
+                  )}
+
+                  {selected.status === "PAYMENT_CONFIRMED" && (
+                    <Button
+                      className="w-full bg-rdc-navy text-white hover:bg-rdc-navy/90"
+                      disabled={acting === selected.id}
+                      onClick={() => doAction(selected.id, "submit")}
+                    >
+                      {acting === selected.id
+                        ? "…"
+                        : "Marquer comme soumis"}
+                    </Button>
+                  )}
+
+                  {selected.status === "SUBMITTED" && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="adj-amount">Montant adjugé</Label>
+                          <Input
+                            id="adj-amount"
+                            type="number"
+                            placeholder={selected.amount}
+                            value={adjForm.amount}
+                            onChange={(e) =>
+                              setAdjForm((f) => ({
+                                ...f,
+                                amount: e.target.value,
+                              }))
+                            }
+                            className="h-9"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="adj-rate">Taux adjugé (%)</Label>
+                          <Input
+                            id="adj-rate"
+                            type="number"
+                            step="0.01"
+                            placeholder="12.50"
+                            value={adjForm.rate}
+                            onChange={(e) =>
+                              setAdjForm((f) => ({
+                                ...f,
+                                rate: e.target.value,
+                              }))
+                            }
+                            className="h-9"
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
+                        disabled={
+                          acting === selected.id ||
+                          !adjForm.amount ||
+                          !adjForm.rate
+                        }
+                        onClick={() =>
+                          doAction(selected.id, "adjudicate", {
+                            adjudicatedAmount: parseFloat(adjForm.amount),
+                            adjudicatedRate: parseFloat(adjForm.rate) / 100,
+                          })
+                        }
+                      >
+                        {acting === selected.id ? "…" : "Adjuger"}
+                      </Button>
+                    </div>
+                  )}
+
+                  {![
+                    "CANCELLED",
+                    "FAILED",
+                    "REIMBURSED",
+                    "ADJUDICATED",
+                    "ACTIVE",
+                    "MATURED",
+                  ].includes(selected.status) && (
+                      <DialogFooter className="sm:justify-stretch">
+                        <Button
+                          variant="outline"
+                          className="w-full border-destructive/30 text-destructive hover:bg-destructive/10"
+                          disabled={acting === selected.id}
+                          onClick={() => doAction(selected.id, "cancel")}
+                        >
+                          {acting === selected.id
+                            ? "…"
+                            : "Annuler la souscription"}
+                        </Button>
+                      </DialogFooter>
+                    )}
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
