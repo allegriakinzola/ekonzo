@@ -44,3 +44,14 @@ export const getUserKycStatus = cache(async (userId: string) => {
   });
   return user?.kycStatus ?? "PENDING";
 });
+
+/**
+ * Indique si l'utilisateur a signé la version active de la convention
+ * de compte-titres.
+ */
+export const hasSignedConvention = cache(async (userId: string) => {
+  const { hasSignedActiveConvention } = await import(
+    "@/modules/convention/convention.service"
+  );
+  return hasSignedActiveConvention(userId);
+});

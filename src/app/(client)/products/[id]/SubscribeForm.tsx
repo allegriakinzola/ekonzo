@@ -44,17 +44,29 @@ type PayPhase =
 export function SubscribeForm({
   product,
   accountPhone,
+  settlement,
 }: {
   product: Product;
   accountPhone: string;
+  settlement?: {
+    preferredChannel: "MOBILE_MONEY" | "BANK_TRANSFER";
+    momoPhone: string | null;
+    bankName: string | null;
+    bankAccountNumber: string | null;
+    isComplete: boolean;
+  } | null;
 }) {
   const router = useRouter();
+  const defaultMomo = settlement?.momoPhone || accountPhone || "";
   const [channel, setChannel] = useState<"MOBILE_MONEY" | "BANK_TRANSFER">(
-    "MOBILE_MONEY",
+    settlement?.preferredChannel ?? "MOBILE_MONEY",
   );
   const [amount, setAmount] = useState("");
-  const [bankName, setBankName] = useState("");
-  const [bankAccount, setBankAccount] = useState("");
+  const [momoPhone, setMomoPhone] = useState(defaultMomo);
+  const [bankName, setBankName] = useState(settlement?.bankName ?? "");
+  const [bankAccount, setBankAccount] = useState(
+    settlement?.bankAccountNumber ?? "",
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [phase, setPhase] = useState<PayPhase>("form");
@@ -129,16 +141,18 @@ export function SubscribeForm({
           productId: product.id,
           amount: amountNum,
           paymentChannel: channel,
-          ...(channel === "MOBILE_MONEY" ? {} : { bankName, bankAccount }),
+          ...(channel === "MOBILE_MONEY"
+            ? { momoPhone: momoPhone.trim() }
+            : { bankName, bankAccount }),
         }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur lors de la souscription.");
 
       if (channel === "MOBILE_MONEY") {
-        if (!accountPhone) {
+        if (!momoPhone.trim()) {
           throw new Error(
-            "Aucun numéro de téléphone sur votre compte. Mettez à jour votre profil.",
+            "Aucun numéro Mobile Money. Configurez votre profil de règlement.",
           );
         }
         if (!json.momoPromptSent || !json.id) {
@@ -359,16 +373,22 @@ export function SubscribeForm({
 
           {channel === "MOBILE_MONEY" && (
             <div className="space-y-1.5">
-              <Label>Numéro Mobile Money</Label>
-              <div className="flex h-11 items-center rounded-lg border border-border bg-muted/50 px-3 text-sm font-medium">
-                {accountPhone || "—"}
-              </div>
+              <Label htmlFor="momoPhone">Numéro Mobile Money</Label>
+              <Input
+                id="momoPhone"
+                value={momoPhone}
+                onChange={(e) => setMomoPhone(e.target.value)}
+                placeholder="812345678"
+                inputMode="numeric"
+                maxLength={9}
+                className="h-11"
+              />
               <p className="text-xs text-muted-foreground">
-                Numéro de votre compte — EasyPay enverra le prompt USSD sur ce
-                numéro (l’opérateur est détecté automatiquement).
-                {accountPhone
-                  ? ""
-                  : " Aucun numéro trouvé : reconnectez-vous ou contactez le support."}
+                Prérempli depuis votre{" "}
+                <a href="/settlement" className="underline hover:text-foreground">
+                  profil de règlement
+                </a>
+                . EasyPay enverra le prompt USSD sur ce numéro.
               </p>
             </div>
           )}
@@ -412,6 +432,13 @@ export function SubscribeForm({
                   required
                 />
               </div>
+              <p className="text-xs text-muted-foreground">
+                Prérempli depuis votre{" "}
+                <a href="/settlement" className="underline hover:text-foreground">
+                  profil de règlement
+                </a>
+                .
+              </p>
             </div>
           )}
 
@@ -431,7 +458,9 @@ export function SubscribeForm({
               loading ||
               !valid ||
               amountNum === 0 ||
-              (channel === "MOBILE_MONEY" && !accountPhone)
+              (channel === "MOBILE_MONEY" && !momoPhone.trim()) ||
+              (channel === "BANK_TRANSFER" &&
+                (!bankName.trim() || !bankAccount.trim()))
             }
           >
             {loading

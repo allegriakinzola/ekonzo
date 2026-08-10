@@ -36,10 +36,12 @@ model User {
   wallets       Wallet[]
   momoAccounts  MomoAccount[]
   bankAccounts  BankAccount[]
-  subscriptions Subscription[]
-  transactions  Transaction[]
-  notifications Notification[]
-  auditLogs     AuditLog[]
+  subscriptions           Subscription[]
+  transactions            Transaction[]
+  notifications           Notification[]
+  auditLogs               AuditLog[]
+  securitiesAgreements    SecuritiesAccountAgreement[]
+  settlementProfile       SettlementProfile?
 
   @@map("user")
 }
@@ -120,6 +122,55 @@ model KYC {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// CONVENTION DE COMPTE-TITRES — art. 66 loi 22/069 + Code du numérique
+// ══════════════════════════════════════════════════════════════════════════
+
+/// Version publiée du texte de convention (tenue au nom de la banque partenaire).
+model SecuritiesAccountConvention {
+  id              String   @id @default(cuid())
+  version         String   @unique
+  title           String
+  partnerBankName String
+  bodyMarkdown    String
+  effectiveFrom   DateTime @default(now())
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  agreements SecuritiesAccountAgreement[]
+
+  @@map("securities_account_convention")
+}
+
+/// Acceptation / signature électronique d'un utilisateur pour une version donnée.
+model SecuritiesAccountAgreement {
+  id                 String   @id @default(cuid())
+  userId             String
+  conventionId       String
+  /// Banque choisie pour la tenue du compte-titres (ex. EQUITY_BCDC).
+  partnerBankCode    String
+  partnerBankName    String
+  signedName         String
+  signatureMethod    String   @default("TYPED")
+  signatureHash      String
+  signatureImagePath String?
+  pdfPath            String
+  pdfSha256          String
+  ipAddress          String?
+  userAgent          String?
+  acceptedTerms      Boolean  @default(true)
+  signedAt           DateTime @default(now())
+  createdAt          DateTime @default(now())
+
+  user       User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  convention SecuritiesAccountConvention @relation(fields: [conventionId], references: [id])
+
+  @@unique([userId, conventionId])
+  @@index([userId, signedAt])
+  @@map("securities_account_agreement")
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // WALLET — solde par devise
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -175,6 +226,26 @@ model BankAccount {
   subscriptions Subscription[]
 
   @@unique([userId, accountNumber, currency])
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PROFIL DE RÈGLEMENT — canal préféré MoMo / RIB pour souscriptions
+// ══════════════════════════════════════════════════════════════════════════
+
+model SettlementProfile {
+  id                String          @id @default(cuid())
+  userId            String          @unique
+  preferredChannel  PaymentChannel  @default(MOBILE_MONEY)
+  momoPhone         String?
+  bankName          String?
+  bankAccountNumber String?
+  bankAccountName   String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("settlement_profile")
 }
 
 // ══════════════════════════════════════════════════════════════════════════

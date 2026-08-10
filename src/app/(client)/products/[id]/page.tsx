@@ -17,7 +17,12 @@ import {
   getCommittedVolumes,
   volumeLeft as calcVolumeLeft,
 } from "@/lib/product-volume";
-import { getUserKycStatus, requireRole } from "@/lib/session";
+import {
+  getUserKycStatus,
+  hasSignedConvention,
+  requireRole,
+} from "@/lib/session";
+import { getSettlementProfile } from "@/modules/settlement/settlement.service";
 import { cn } from "@/lib/utils";
 import { SubscribeForm } from "./SubscribeForm";
 
@@ -29,15 +34,21 @@ export default async function ProductDetailPage({
   const { id } = await params;
   const session = await requireRole("CLIENT");
 
-  const [kycStatus, p, accountUser] = await Promise.all([
-    getUserKycStatus(session.user.id),
-    prisma.product.findUnique({ where: { id } }),
-    prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { phoneNumber: true },
-    }),
-  ]);
+  const [kycStatus, conventionSigned, p, accountUser, settlement] =
+    await Promise.all([
+      getUserKycStatus(session.user.id),
+      hasSignedConvention(session.user.id),
+      prisma.product.findUnique({ where: { id } }),
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { phoneNumber: true },
+      }),
+      getSettlementProfile(session.user.id),
+    ]);
 
+  if (!conventionSigned) {
+    redirect("/convention");
+  }
   if (kycStatus !== "VERIFIED") {
     redirect("/kyc");
   }
@@ -162,6 +173,7 @@ export default async function ProductDetailPage({
       <SubscribeForm
         product={productForForm}
         accountPhone={accountUser?.phoneNumber ?? ""}
+        settlement={settlement}
       />
     </div>
   );

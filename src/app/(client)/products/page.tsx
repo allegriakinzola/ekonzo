@@ -22,12 +22,14 @@ import {
   getCommittedVolumes,
   volumeLeft as calcVolumeLeft,
 } from "@/lib/product-volume";
-import { getUserKycStatus, requireRole } from "@/lib/session";
+import { getUserKycStatus, hasSignedConvention, requireRole } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 export default async function ProductsPage() {
   const session = await requireRole("CLIENT");
   const kycVerified = (await getUserKycStatus(session.user.id)) === "VERIFIED";
+  const conventionSigned = await hasSignedConvention(session.user.id);
+  const canSubscribe = kycVerified && conventionSigned;
 
   const products = await prisma.product.findMany({
     where: { status: "OPEN" },
@@ -68,7 +70,29 @@ export default async function ProductsPage() {
         </Badge>
       </div>
 
-      {!kycVerified && (
+      {!conventionSigned && (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+          <WarningCircleIcon className="size-4 text-amber-700" weight="fill" />
+          <AlertTitle className="text-amber-900">
+            Convention de compte-titres requise
+          </AlertTitle>
+          <AlertDescription className="flex flex-col gap-3 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Signez la convention électronique pour ouvrir votre compte-titres
+              auprès de la banque partenaire.
+            </span>
+            <Button
+              render={<Link href="/convention" />}
+              size="sm"
+              className="bg-amber-700 text-white hover:bg-amber-800"
+            >
+              Signer la convention
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {conventionSigned && !kycVerified && (
         <Alert className="border-amber-200 bg-amber-50 text-amber-950">
           <WarningCircleIcon className="size-4 text-amber-700" weight="fill" />
           <AlertTitle className="text-amber-900">
@@ -192,7 +216,7 @@ export default async function ProductsPage() {
                 </CardContent>
 
                 <CardFooter>
-                  {kycVerified ? (
+                  {canSubscribe ? (
                     <Button
                       className="w-full"
                       size="lg"
@@ -201,8 +225,20 @@ export default async function ProductsPage() {
                       Souscrire
                     </Button>
                   ) : (
-                    <Button className="w-full" size="lg" disabled>
-                      KYC requis pour souscrire
+                    <Button
+                      className="w-full"
+                      size="lg"
+                      render={
+                        <Link
+                          href={
+                            !conventionSigned ? "/convention" : "/kyc"
+                          }
+                        />
+                      }
+                    >
+                      {!conventionSigned
+                        ? "Signer la convention"
+                        : "KYC requis pour souscrire"}
                     </Button>
                   )}
                 </CardFooter>

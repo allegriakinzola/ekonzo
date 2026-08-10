@@ -25,6 +25,11 @@ const NAV_ITEMS = [
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
   },
   {
+    href: "/settlement",
+    label: "Règlement",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>,
+  },
+  {
     href: "/kyc",
     label: "Mon identité",
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" /></svg>,
@@ -39,18 +44,66 @@ const NAV_ITEMS = [
 interface ClientSidebarProps {
   userName: string;
   kycStatus: string;
+  conventionSigned?: boolean;
 }
 
-export function ClientSidebar({ userName, kycStatus }: ClientSidebarProps) {
+export function ClientSidebar({
+  userName,
+  kycStatus,
+  conventionSigned = false,
+}: ClientSidebarProps) {
   const verified = kycStatus === "VERIFIED";
+  const ready = conventionSigned && verified;
   return (
     <AppSidebar
       userName={userName}
-      statusLabel={verified ? "Identité vérifiée" : "Identité non vérifiée"}
-      statusColor={verified ? "emerald" : "amber"}
-      navItems={NAV_ITEMS}
+      statusLabel={
+        ready
+          ? "Compte prêt"
+          : !conventionSigned
+            ? "Convention à signer"
+            : "Identité non vérifiée"
+      }
+      statusColor={ready ? "emerald" : "amber"}
+      navItems={[
+        ...NAV_ITEMS.slice(0, 3),
+        {
+          href: "/convention",
+          label: "Compte-titres",
+          icon: (
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+          ),
+        },
+        ...NAV_ITEMS.slice(3),
+      ]}
       alert={
-        !verified ? (
+        !conventionSigned ? (
+          <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+            <WarningCircleIcon className="size-4 text-amber-700" weight="fill" />
+            <AlertTitle className="text-amber-900">Convention requise</AlertTitle>
+            <AlertDescription className="text-amber-800">
+              <Button
+                render={<Link href="/convention" />}
+                size="sm"
+                className="mt-2 bg-amber-700 text-white hover:bg-amber-800"
+              >
+                Signer
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : !verified ? (
           <Alert className="border-amber-200 bg-amber-50 text-amber-950">
             <WarningCircleIcon className="size-4 text-amber-700" weight="fill" />
             <AlertTitle className="text-amber-900">Identité non vérifiée</AlertTitle>

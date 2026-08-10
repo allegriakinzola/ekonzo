@@ -16,7 +16,10 @@ import {
 import { formatDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { getSettlementProfile } from "@/modules/settlement/settlement.service";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 const KYC_LABELS: Record<string, string> = {
   PENDING: "Non soumis",
@@ -51,30 +54,33 @@ const DOC_LABELS: Record<string, string> = {
 export default async function ProfilePage() {
   const session = await requireRole("CLIENT");
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      id: true,
-      name: true,
-      phoneNumber: true,
-      email: true,
-      kycStatus: true,
-      createdAt: true,
-      kyc: {
-        select: {
-          firstName: true,
-          lastName: true,
-          postName: true,
-          docType: true,
-          status: true,
-          submittedAt: true,
-          verifiedAt: true,
+  const [user, settlement] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        name: true,
+        phoneNumber: true,
+        email: true,
+        kycStatus: true,
+        createdAt: true,
+        kyc: {
+          select: {
+            firstName: true,
+            lastName: true,
+            postName: true,
+            docType: true,
+            status: true,
+            submittedAt: true,
+            verifiedAt: true,
+          },
         },
+        wallets: { select: { currency: true, balance: true } },
+        _count: { select: { subscriptions: true } },
       },
-      wallets: { select: { currency: true, balance: true } },
-      _count: { select: { subscriptions: true } },
-    },
-  });
+    }),
+    getSettlementProfile(session.user.id),
+  ]);
 
   if (!user) return null;
 
@@ -174,6 +180,53 @@ export default async function ProfilePage() {
           </CardContent>
         </Card>
       )}
+
+      <Card className="ring-1 ring-rdc-navy/5">
+        <CardHeader className="border-b [.border-b]:pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base">Profil de règlement</CardTitle>
+              <CardDescription>
+                Canal préféré pour payer vos souscriptions
+              </CardDescription>
+            </div>
+            <Badge
+              variant="outline"
+              className={cn(
+                settlement.isComplete
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-amber-200 bg-amber-50 text-amber-800",
+              )}
+            >
+              {settlement.isComplete ? "Configuré" : "À compléter"}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field
+              label="Canal préféré"
+              value={
+                settlement.preferredChannel === "MOBILE_MONEY"
+                  ? "Mobile Money"
+                  : "Virement bancaire"
+              }
+            />
+            <Field
+              label="Mobile Money"
+              value={settlement.momoPhone ?? "—"}
+            />
+            <Field label="Banque" value={settlement.bankName ?? "—"} />
+            <Field
+              label="N° de compte"
+              value={settlement.bankAccountNumber ?? "—"}
+            />
+          </div>
+          <Button render={<Link href="/settlement" />} size="sm">
+            {settlement.isComplete ? "Modifier" : "Configurer"}
+          </Button>
+        </CardContent>
+      </Card>
 
       <Alert>
         <LockIcon className="size-4" />

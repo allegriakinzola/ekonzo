@@ -27,7 +27,8 @@ import {
   getCommittedVolumes,
   volumeLeft as calcVolumeLeft,
 } from "@/lib/product-volume";
-import { getUserKycStatus, requireRole } from "@/lib/session";
+import { getUserKycStatus, hasSignedConvention, requireRole } from "@/lib/session";
+import { getSettlementProfile } from "@/modules/settlement/settlement.service";
 import { cn } from "@/lib/utils";
 
 const QUICK_ACTIONS = [
@@ -44,9 +45,9 @@ const QUICK_ACTIONS = [
     icon: ChartLineUpIcon,
   },
   {
-    href: "/kyc",
-    label: "Vérification d'identité",
-    desc: "Activez votre compte pour investir",
+    href: "/convention",
+    label: "Convention compte-titres",
+    desc: "Ouvrez votre compte auprès de la banque",
     icon: IdentificationCardIcon,
   },
 ];
@@ -59,6 +60,8 @@ export default async function DashboardPage() {
   const kycStatus = await getUserKycStatus(session.user.id);
   const kycSubmitted =
     kycStatus === "SUBMITTED" || kycStatus === "UNDER_REVIEW";
+  const conventionSigned = await hasSignedConvention(session.user.id);
+  const settlement = await getSettlementProfile(session.user.id);
 
   const [subscriptions, wallets, openProducts] = await Promise.all([
     prisma.subscription.findMany({
@@ -196,6 +199,50 @@ export default async function DashboardPage() {
         </Alert>
       )}
 
+      {kycStatus === "VERIFIED" && !conventionSigned && (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+          <WarningCircleIcon className="size-4 text-amber-700" weight="fill" />
+          <AlertTitle className="text-amber-900">
+            Signez votre convention de compte-titres
+          </AlertTitle>
+          <AlertDescription className="flex flex-col gap-3 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Ouvrez votre compte-titres auprès de la banque partenaire pour
+              pouvoir souscrire.
+            </span>
+            <Button
+              render={<Link href="/convention" />}
+              size="sm"
+              className="bg-amber-700 text-white hover:bg-amber-800"
+            >
+              Signer maintenant
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {conventionSigned && !settlement.isComplete && (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-950">
+          <WarningCircleIcon className="size-4 text-amber-700" weight="fill" />
+          <AlertTitle className="text-amber-900">
+            Configurez votre profil de règlement
+          </AlertTitle>
+          <AlertDescription className="flex flex-col gap-3 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Enregistrez votre Mobile Money ou RIB pour préremplir vos
+              prochaines souscriptions.
+            </span>
+            <Button
+              render={<Link href="/settlement" />}
+              size="sm"
+              className="bg-amber-700 text-white hover:bg-amber-800"
+            >
+              Configurer
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {STAT_CARDS.map((card) => {
           const Icon = card.icon;
@@ -285,7 +332,13 @@ export default async function DashboardPage() {
               return (
                 <Link
                   key={p.id}
-                  href={kycStatus === "VERIFIED" ? `/products/${p.id}` : "/kyc"}
+                  href={
+                    !conventionSigned
+                      ? "/convention"
+                      : kycStatus !== "VERIFIED"
+                        ? "/kyc"
+                        : `/products/${p.id}`
+                  }
                   className="group"
                 >
                   <Card className="h-full transition-shadow group-hover:shadow-md ring-1 ring-rdc-navy/5">

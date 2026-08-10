@@ -214,7 +214,7 @@ export default function RegisterPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
-      router.push("/dashboard");
+      router.push("/convention");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur lors de la création du mot de passe.");
     } finally {

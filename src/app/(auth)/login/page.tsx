@@ -41,7 +41,7 @@ export default function LoginPage() {
       const email = `${data.phoneNumber}@phone.ekonzo.cd`;
       const result = await authClient.signIn.email({ email, password: data.password });
       if (result.error) throw new Error(result.error.message);
-      router.push("/dashboard");
+      router.push("/convention");
     } catch {
       setError("Numéro ou mot de passe incorrect.");
     } finally {

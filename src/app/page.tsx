@@ -149,7 +149,7 @@ function SectionHeading({
   title: string;
   desc?: string;
 }) {
-  return (
+  return ( 
     <div className="mx-auto mb-10 max-w-2xl space-y-3 text-center sm:mb-14">
       <p className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-primary">
         {eyebrow}

@@ -102,6 +102,19 @@ export default async function KycPage() {
         <p className="text-center text-xs text-muted-foreground">
           Pour toute correction, contactez le support ekonzo.
         </p>
+
+        <div className="rounded-xl border border-primary/15 bg-primary/5 p-4 text-center">
+          <p className="text-sm text-rdc-navy">
+            Prochaine étape : signer la convention de compte-titres pour pouvoir
+            souscrire.
+          </p>
+          <a
+            href="/convention"
+            className="mt-3 inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Ouvrir la convention
+          </a>
+        </div>
       </div>
     );
   }

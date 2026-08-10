@@ -13,11 +13,14 @@ import {
   isValidMomoPhone,
   normalizeMomoPhone,
 } from "@/modules/payments/phone";
+import { hasSignedActiveConvention } from "@/modules/convention/convention.service";
+import { getSettlementProfile } from "@/modules/settlement/settlement.service";
 
 const bodySchema = z.object({
   productId: z.string().min(1),
   amount: z.number().positive(),
   paymentChannel: z.enum(["MOBILE_MONEY", "BANK_TRANSFER"]),
+  momoPhone: z.string().optional(),
   bankName: z.string().optional(),
   bankAccount: z.string().optional(),
   bankTransferRef: z.string().optional(),
@@ -26,6 +29,13 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+
+  if (!(await hasSignedActiveConvention(session.user.id))) {
+    return NextResponse.json(
+      { error: "Convention de compte-titres non signée" },
+      { status: 403 },
+    );
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -44,10 +54,16 @@ export async function POST(req: NextRequest) {
     productId,
     amount,
     paymentChannel,
-    bankName,
-    bankAccount,
+    momoPhone: momoPhoneInput,
+    bankName: bankNameInput,
+    bankAccount: bankAccountInput,
     bankTransferRef,
   } = body.data;
+
+  const settlement = await getSettlementProfile(session.user.id);
+  const bankName = bankNameInput || settlement.bankName || undefined;
+  const bankAccount =
+    bankAccountInput || settlement.bankAccountNumber || undefined;
 
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product || product.status !== "OPEN") {
@@ -83,18 +99,26 @@ export async function POST(req: NextRequest) {
   let momoPhone: string | undefined;
 
   if (paymentChannel === "MOBILE_MONEY") {
-    if (!user?.phoneNumber) {
+    const rawPhone =
+      momoPhoneInput ||
+      settlement.momoPhone ||
+      user?.phoneNumber ||
+      null;
+    if (!rawPhone) {
       return NextResponse.json(
-        { error: "Aucun numéro de téléphone associé à votre compte." },
+        {
+          error:
+            "Aucun numéro Mobile Money. Configurez votre profil de règlement.",
+        },
         { status: 400 },
       );
     }
-    momoPhone = normalizeMomoPhone(user.phoneNumber);
+    momoPhone = normalizeMomoPhone(rawPhone);
     if (!isValidMomoPhone(momoPhone)) {
       return NextResponse.json(
         {
           error:
-            "Le numéro de votre compte est invalide. Contactez le support (format attendu : 9 chiffres, ex. 812345678).",
+            "Le numéro Mobile Money est invalide (format attendu : 9 chiffres, ex. 812345678).",
         },
         { status: 400 },
       );
