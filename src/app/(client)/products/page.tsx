@@ -104,12 +104,12 @@ export default async function ProductsPage() {
               produit.
             </span>
             <Button
-              render={<Link href="/kyc" />}
+              render={<Link href="/profile" />}
               size="sm"
               className="bg-amber-700 text-white hover:bg-amber-800"
             >
               <IdentificationCardIcon className="size-4" />
-              Vérifier maintenant
+              Voir mon profil
             </Button>
           </AlertDescription>
         </Alert>
@@ -231,7 +231,7 @@ export default async function ProductsPage() {
                       render={
                         <Link
                           href={
-                            !conventionSigned ? "/convention" : "/kyc"
+                            !conventionSigned ? "/convention" : "/profile"
                           }
                         />
                       }

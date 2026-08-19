@@ -276,21 +276,11 @@ export function ConventionSignForm() {
               </p>
             </div>
           </div>
-          <div className="grid gap-2 text-sm sm:grid-cols-2">
-            <div className="rounded-lg border bg-muted/40 px-3 py-2">
-              <p className="text-[10px] uppercase text-muted-foreground">
-                Signataire
-              </p>
-              <p className="font-semibold">{data.agreement.signedName}</p>
-            </div>
-            <div className="rounded-lg border bg-muted/40 px-3 py-2">
-              <p className="text-[10px] uppercase text-muted-foreground">
-                Empreinte PDF
-              </p>
-              <p className="break-all font-mono text-[11px]">
-                {data.agreement.pdfSha256.slice(0, 24)}…
-              </p>
-            </div>
+          <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+            <p className="text-[10px] uppercase text-muted-foreground">
+              Signataire
+            </p>
+            <p className="font-semibold">{data.agreement.signedName}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button

@@ -65,7 +65,6 @@ export default async function AdminUsersPage() {
       id: true,
       name: true,
       phoneNumber: true,
-      email: true,
       role: true,
       kycStatus: true,
       banned: true,
@@ -146,11 +145,6 @@ export default async function AdminUsersPage() {
                           </p>
                           {u.banned && (
                             <p className="text-xs text-destructive">Banni</p>
-                          )}
-                          {u.email && (
-                            <p className="text-xs text-muted-foreground">
-                              {u.email}
-                            </p>
                           )}
                         </div>
                       </div>

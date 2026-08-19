@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Tableau de bord", icon: "⊞" },
   { href: "/products", label: "Produits", icon: "◈" },
   { href: "/portfolio", label: "Portefeuille", icon: "◎" },
-  { href: "/kyc", label: "Mon identité", icon: "⊙" },
+  { href: "/profile", label: "Mon profil", icon: "⊙" },
 ];
 
 export function ClientHeader({ userName, kycStatus }: { userName: string; kycStatus: string }) {
@@ -68,13 +68,10 @@ export function ClientHeader({ userName, kycStatus }: { userName: string; kycSta
         <div className="flex items-center gap-2">
           {/* KYC badge */}
           {kycStatus !== "VERIFIED" && (
-            <Link
-              href="/kyc"
-              className="hidden sm:flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
-            >
+            <span className="hidden sm:flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700">
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
               Identité non vérifiée
-            </Link>
+            </span>
           )}
 
           {/* Avatar menu */}
@@ -98,9 +95,6 @@ export function ClientHeader({ userName, kycStatus }: { userName: string; kycSta
                   </div>
                   <Link href="/profile" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-muted" onClick={() => setMenuOpen(false)}>
                     Mon profil
-                  </Link>
-                  <Link href="/kyc" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-muted" onClick={() => setMenuOpen(false)}>
-                    Vérification KYC
                   </Link>
                   <div className="border-t mt-1">
                     <button

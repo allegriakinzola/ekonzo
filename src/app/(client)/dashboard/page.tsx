@@ -188,11 +188,11 @@ export default async function DashboardPage() {
             </span>
             {!kycSubmitted && (
               <Button
-                render={<Link href="/kyc" />}
+                render={<Link href="/profile" />}
                 size="sm"
                 className="bg-amber-700 text-white hover:bg-amber-800"
               >
-                Vérifier maintenant
+                Voir mon profil
               </Button>
             )}
           </AlertDescription>
@@ -336,7 +336,7 @@ export default async function DashboardPage() {
                     !conventionSigned
                       ? "/convention"
                       : kycStatus !== "VERIFIED"
-                        ? "/kyc"
+                        ? "/profile"
                         : `/products/${p.id}`
                   }
                   className="group"

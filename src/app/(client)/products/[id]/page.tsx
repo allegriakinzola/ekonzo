@@ -50,7 +50,7 @@ export default async function ProductDetailPage({
     redirect("/convention");
   }
   if (kycStatus !== "VERIFIED") {
-    redirect("/kyc");
+    redirect("/profile");
   }
   if (!p || p.status !== "OPEN") notFound();
 
