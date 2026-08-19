@@ -141,15 +141,16 @@ export default function RegisterPage() {
     setLoading(true);
     setError("");
     try {
-      const { compressImageForUpload, readJsonResponse } = await import(
-        "@/lib/client-upload"
-      );
+      const { compressImageForUpload, readJsonResponse, fileToBase64, persistKycDocBase64 } =
+        await import("@/lib/client-upload");
       const compressed = await compressImageForUpload(docFile);
       docFileRef.current = compressed;
       setDocFile(compressed);
+      const docB64 = await fileToBase64(compressed);
+      persistKycDocBase64(docB64);
 
       const formData = new FormData();
-      formData.append("docFront", compressed);
+      formData.append("docFront", compressed, compressed.name || "doc_front.jpg");
       const res = await fetch("/api/kyc/extract", {
         method: "POST",
         body: formData,
@@ -192,30 +193,42 @@ export default function RegisterPage() {
       setError("Sélectionnez votre photo selfie.");
       return;
     }
-    const recto = docFileRef.current ?? docFile;
-    if (!recto) {
-      setError("Document manquant — revenez à l'étape photo de la carte.");
-      return;
-    }
     setLoading(true);
     setError("");
     try {
-      const { compressImageForUpload, readJsonResponse } = await import(
-        "@/lib/client-upload"
-      );
-      // Re-compresser les deux pour garantir < ~2 Mo au total (limite Vercel)
-      const [docCompressed, selfieCompressed] = await Promise.all([
-        compressImageForUpload(recto),
-        compressImageForUpload(selfieFile),
-      ]);
-      docFileRef.current = docCompressed;
-      setDocFile(docCompressed);
+      const {
+        compressImageForUpload,
+        readJsonResponse,
+        fileToBase64,
+        loadKycDocBase64,
+        persistKycDocBase64,
+        clearKycDocBase64,
+      } = await import("@/lib/client-upload");
+
+      const selfieCompressed = await compressImageForUpload(selfieFile);
       setSelfieFile(selfieCompressed);
 
+      let docCompressed = docFileRef.current ?? docFile;
+      let docB64 = loadKycDocBase64()?.base64 ?? null;
+
+      if (docCompressed) {
+        docCompressed = await compressImageForUpload(docCompressed);
+        docFileRef.current = docCompressed;
+        setDocFile(docCompressed);
+        docB64 = await fileToBase64(docCompressed);
+        persistKycDocBase64(docB64);
+      }
+
+      if (!docB64) {
+        throw new Error(
+          "Document manquant — revenez à l'étape photo de la carte et ré-analysez le document.",
+        );
+      }
+
       const formData = new FormData();
-      // Recto en premier — obligatoire sur Vercel
-      formData.append("docFront", docCompressed, docCompressed.name || "doc_front.jpg");
-      formData.append("selfie", selfieCompressed, selfieCompressed.name || "selfie.jpg");
+      // Base64 uniquement : plus fiable que multipart File sur mobile / Vercel
+      formData.append("docFrontBase64", docB64);
+      formData.append("selfieBase64", await fileToBase64(selfieCompressed));
       formData.append("docType", docType);
       formData.append("firstName", fields.firstName);
       formData.append("lastName", fields.lastName);
@@ -236,6 +249,7 @@ export default function RegisterPage() {
       }>(res);
       if (!res.ok) throw new Error(json.error ?? "Échec de la vérification.");
 
+      clearKycDocBase64();
       setKycResult({
         approved: Boolean(json.approved),
         similarity: json.similarity ?? 0,

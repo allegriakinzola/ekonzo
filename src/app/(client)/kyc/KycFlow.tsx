@@ -72,15 +72,19 @@ export function KycFlow() {
     setLoading(true);
     setError("");
     try {
-      const { compressImageForUpload, readJsonResponse } = await import(
-        "@/lib/client-upload"
-      );
+      const {
+        compressImageForUpload,
+        readJsonResponse,
+        fileToBase64,
+        persistKycDocBase64,
+      } = await import("@/lib/client-upload");
       const compressed = await compressImageForUpload(docFile);
       docFileRef.current = compressed;
       setDocFile(compressed);
+      persistKycDocBase64(await fileToBase64(compressed));
 
       const formData = new FormData();
-      formData.append("docFront", compressed);
+      formData.append("docFront", compressed, compressed.name || "doc_front.jpg");
       const res = await fetch("/api/kyc/extract", {
         method: "POST",
         body: formData,
@@ -127,36 +131,41 @@ export function KycFlow() {
       setError("Sélectionnez votre photo selfie.");
       return;
     }
-    const recto = docFileRef.current ?? docFile;
-    if (!recto) {
-      setError("Document manquant — revenez à l'étape photo du document.");
-      return;
-    }
     setLoading(true);
     setError("");
     try {
-      const { compressImageForUpload, readJsonResponse } = await import(
-        "@/lib/client-upload"
-      );
-      const [docCompressed, selfieCompressed] = await Promise.all([
-        compressImageForUpload(recto),
-        compressImageForUpload(selfieFile),
-      ]);
-      docFileRef.current = docCompressed;
-      setDocFile(docCompressed);
+      const {
+        compressImageForUpload,
+        readJsonResponse,
+        fileToBase64,
+        loadKycDocBase64,
+        persistKycDocBase64,
+        clearKycDocBase64,
+      } = await import("@/lib/client-upload");
+
+      const selfieCompressed = await compressImageForUpload(selfieFile);
       setSelfieFile(selfieCompressed);
 
+      let docCompressed = docFileRef.current ?? docFile;
+      let docB64 = loadKycDocBase64()?.base64 ?? null;
+
+      if (docCompressed) {
+        docCompressed = await compressImageForUpload(docCompressed);
+        docFileRef.current = docCompressed;
+        setDocFile(docCompressed);
+        docB64 = await fileToBase64(docCompressed);
+        persistKycDocBase64(docB64);
+      }
+
+      if (!docB64) {
+        throw new Error(
+          "Document manquant — revenez à l'étape photo du document et ré-analysez-le.",
+        );
+      }
+
       const formData = new FormData();
-      formData.append(
-        "docFront",
-        docCompressed,
-        docCompressed.name || "doc_front.jpg",
-      );
-      formData.append(
-        "selfie",
-        selfieCompressed,
-        selfieCompressed.name || "selfie.jpg",
-      );
+      formData.append("docFrontBase64", docB64);
+      formData.append("selfieBase64", await fileToBase64(selfieCompressed));
       formData.append("docType", docType);
       formData.append("firstName", fields.firstName);
       formData.append("lastName", fields.lastName);
@@ -178,6 +187,7 @@ export function KycFlow() {
       }>(res);
       if (!res.ok) throw new Error(json.error ?? "Échec de la vérification.");
 
+      clearKycDocBase64();
       setResult({
         approved: Boolean(json.approved),
         similarity: json.similarity ?? 0,
