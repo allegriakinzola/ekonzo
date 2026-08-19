@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, readFile } from "fs/promises";
+import os from "os";
 import path from "path";
 import { prisma } from "@/lib/prisma";
 import {
@@ -13,11 +14,24 @@ import {
   getPartnerBankByCode,
 } from "./partner-banks";
 
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "conventions");
-
 export type SignatureMethod = "TYPED" | "DRAWN";
 
 const TEMPLATE_BANK_LABEL = "la banque partenaire choisie";
+
+/**
+ * Sur Vercel le FS de l'app est en lecture seule → /tmp.
+ * En local : uploads/conventions.
+ */
+export function getConventionUploadDir() {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return path.join(/*turbopackIgnore: true*/ os.tmpdir(), "ekonzo-conventions");
+  }
+  return path.join(
+    /*turbopackIgnore: true*/ process.cwd(),
+    "uploads",
+    "conventions",
+  );
+}
 
 /** Garantit qu'une version active de la convention existe en base. */
 export async function ensureActiveConvention() {
@@ -97,6 +111,39 @@ function parseDataUrlPng(dataUrl: string): Buffer {
   return buf;
 }
 
+/** Lit le PDF signé : base64 DB en priorité, sinon disque. */
+export async function readAgreementPdfBuffer(agreement: {
+  pdfPath: string;
+  pdfBase64?: string | null;
+}): Promise<Buffer> {
+  if (agreement.pdfBase64) {
+    return Buffer.from(agreement.pdfBase64, "base64");
+  }
+  const uploadDir = getConventionUploadDir();
+  const absolute = path.join(uploadDir, agreement.pdfPath);
+  if (!absolute.startsWith(uploadDir)) {
+    throw new Error("Chemin PDF invalide");
+  }
+  return readFile(absolute);
+}
+
+/** Lit l'image de signature : base64 DB ou disque. */
+export async function readAgreementSignatureBuffer(agreement: {
+  signatureImagePath?: string | null;
+  signatureImageBase64?: string | null;
+}): Promise<Buffer | null> {
+  if (agreement.signatureImageBase64) {
+    return Buffer.from(agreement.signatureImageBase64, "base64");
+  }
+  if (!agreement.signatureImagePath) return null;
+  const uploadDir = getConventionUploadDir();
+  const absolute = path.join(uploadDir, agreement.signatureImagePath);
+  if (!absolute.startsWith(uploadDir)) {
+    throw new Error("Chemin signature invalide");
+  }
+  return readFile(absolute);
+}
+
 export async function signActiveConvention(opts: {
   userId: string;
   signedName: string;
@@ -173,19 +220,23 @@ export async function signActiveConvention(opts: {
     signatureMethod: opts.signatureMethod,
   });
 
-  const userDir = path.join(UPLOAD_DIR, opts.userId);
+  const uploadDir = getConventionUploadDir();
+  const userDir = path.join(uploadDir, opts.userId);
   await mkdir(userDir, { recursive: true });
   const stamp = signedAt.toISOString().replace(/[:.]/g, "-");
   const fileName = `convention-${convention.version}-${stamp}.pdf`;
   const absolutePath = path.join(userDir, fileName);
   await writeFile(absolutePath, buffer);
   const pdfPath = path.join(opts.userId, fileName).replace(/\\/g, "/");
+  const pdfBase64 = buffer.toString("base64");
 
   let signatureImagePath: string | undefined;
+  let signatureImageBase64: string | undefined;
   if (signatureImage) {
     const imgName = `signature-${convention.version}-${stamp}.png`;
     await writeFile(path.join(userDir, imgName), signatureImage);
     signatureImagePath = path.join(opts.userId, imgName).replace(/\\/g, "/");
+    signatureImageBase64 = signatureImage.toString("base64");
   }
 
   const agreement = await prisma.securitiesAccountAgreement.create({
@@ -198,7 +249,9 @@ export async function signActiveConvention(opts: {
       signatureMethod: opts.signatureMethod,
       signatureHash,
       signatureImagePath,
+      signatureImageBase64,
       pdfPath,
+      pdfBase64,
       pdfSha256: sha256,
       ipAddress: opts.ipAddress ?? undefined,
       userAgent: opts.userAgent ?? undefined,
@@ -239,8 +292,4 @@ export function listPartnerBanksForApi() {
     shortName: b.shortName,
     logoSrc: b.logoSrc,
   }));
-}
-
-export function getConventionUploadDir() {
-  return UPLOAD_DIR;
 }

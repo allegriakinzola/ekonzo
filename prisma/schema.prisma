@@ -165,6 +165,10 @@ model SecuritiesAccountAgreement {
   signatureMethod    String   @default("TYPED")
   signatureHash      String
   signatureImagePath String?
+  /// Contenu PDF (base64) — requis sur Vercel où /tmp est éphémère.
+  pdfBase64          String?  @db.Text
+  /// PNG signature manuscrite (base64), si méthode DRAWN.
+  signatureImageBase64 String? @db.Text
   pdfPath            String
   pdfSha256          String
   ipAddress          String?

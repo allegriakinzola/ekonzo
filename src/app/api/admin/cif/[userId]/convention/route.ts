@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { readFile } from "fs/promises";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  getConventionUploadDir,
   getUserActiveAgreement,
+  readAgreementPdfBuffer,
 } from "@/modules/convention/convention.service";
-import { resolveConventionFile } from "@/modules/cif/cif.service";
 
 export const runtime = "nodejs";
 
@@ -40,20 +38,14 @@ export async function GET(
     );
   }
 
-  const uploadDir = getConventionUploadDir();
-  const absolute = resolveConventionFile(uploadDir, agreement.pdfPath);
-  if (!absolute) {
-    return NextResponse.json({ error: "Chemin invalide" }, { status: 400 });
-  }
-
   try {
-    const buffer = await readFile(absolute);
+    const buffer = await readAgreementPdfBuffer(agreement);
     const convention = await prisma.securitiesAccountConvention.findUnique({
       where: { id: agreement.conventionId },
       select: { version: true },
     });
     const filename = `CIF-convention-${userId.slice(0, 8)}-v${convention?.version ?? "x"}.pdf`;
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}"`,
@@ -61,7 +53,8 @@ export async function GET(
         "X-Content-SHA256": agreement.pdfSha256,
       },
     });
-  } catch {
+  } catch (err) {
+    console.error("[admin cif convention]", err);
     return NextResponse.json({ error: "Fichier introuvable" }, { status: 404 });
   }
 }
