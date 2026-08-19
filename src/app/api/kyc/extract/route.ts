@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { extractDocumentData } from "@/modules/kyc/kyc.service";
 import { getKycUserDir } from "@/modules/kyc/kyc-paths";
+import { saveKycDocDraft } from "@/modules/kyc/kyc-draft";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,7 +22,7 @@ const ALLOWED_TYPES = [
 
 /**
  * POST /api/kyc/extract
- * Étape 1 du KYC : upload du recto du document + extraction OCR.
+ * Upload recto + OCR + persistance DB (KycDraft) pour l'étape selfie.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -85,6 +86,13 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await docFront.arrayBuffer());
     await writeFile(docPath, buffer);
 
+    // Persistance durable (nécessaire sur Vercel entre extract et verify-face)
+    await saveKycDocDraft(
+      userId,
+      buffer,
+      mime && mime !== "application/octet-stream" ? mime : "image/jpeg",
+    );
+
     try {
       const extracted = await extractDocumentData(docPath);
       const { rawText: _rawText, ...fields } = extracted;
@@ -95,7 +103,6 @@ export async function POST(req: NextRequest) {
       });
     } catch (err) {
       console.error("[KYC extract OCR]", err);
-      // Document sauvegardé — saisie manuelle possible
       return NextResponse.json({
         extracted: {},
         docSaved: true,

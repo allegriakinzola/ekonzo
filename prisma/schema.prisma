@@ -121,6 +121,17 @@ model KYC {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+/// Brouillon KYC : recto stocké entre /extract et /verify-face (Vercel /tmp non partagé).
+model KycDraft {
+  userId    String   @id
+  docMime   String   @default("image/jpeg")
+  docBase64 String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("kyc_draft")
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 // CONVENTION DE COMPTE-TITRES — art. 66 loi 22/069 + Code du numérique
 // ══════════════════════════════════════════════════════════════════════════
