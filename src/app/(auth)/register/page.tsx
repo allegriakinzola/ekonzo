@@ -140,11 +140,24 @@ export default function RegisterPage() {
     setLoading(true);
     setError("");
     try {
+      const { compressImageForUpload, readJsonResponse } = await import(
+        "@/lib/client-upload"
+      );
+      const compressed = await compressImageForUpload(docFile);
+      setDocFile(compressed);
+
       const formData = new FormData();
-      formData.append("docFront", docFile);
-      const res = await fetch("/api/kyc/extract", { method: "POST", body: formData });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
+      formData.append("docFront", compressed);
+      const res = await fetch("/api/kyc/extract", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const json = await readJsonResponse<{
+        error?: string;
+        extracted?: Partial<KycFields>;
+      }>(res);
+      if (!res.ok) throw new Error(json.error ?? "Échec de la lecture du document.");
 
       const ex = json.extracted ?? {};
       setFields({
@@ -177,11 +190,23 @@ export default function RegisterPage() {
       setError("Sélectionnez votre photo selfie.");
       return;
     }
+    if (!docFile) {
+      setError("Document manquant — revenez à l'étape photo de la carte.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
+      const { compressImageForUpload, readJsonResponse } = await import(
+        "@/lib/client-upload"
+      );
+      const selfie = await compressImageForUpload(selfieFile);
+      setSelfieFile(selfie);
+
       const formData = new FormData();
-      formData.append("selfie", selfieFile);
+      formData.append("selfie", selfie);
+      // Re-envoi du recto : obligatoire sur Vercel (stockage /tmp non partagé)
+      formData.append("docFront", docFile);
       formData.append("docType", docType);
       formData.append("firstName", fields.firstName);
       formData.append("lastName", fields.lastName);
@@ -190,11 +215,22 @@ export default function RegisterPage() {
       formData.append("docNumber", fields.docNumber);
       formData.append("address", fields.address);
 
-      const res = await fetch("/api/kyc/verify-face", { method: "POST", body: formData });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
+      const res = await fetch("/api/kyc/verify-face", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const json = await readJsonResponse<{
+        error?: string;
+        approved?: boolean;
+        similarity?: number;
+      }>(res);
+      if (!res.ok) throw new Error(json.error ?? "Échec de la vérification.");
 
-      setKycResult({ approved: json.approved, similarity: json.similarity });
+      setKycResult({
+        approved: Boolean(json.approved),
+        similarity: json.similarity ?? 0,
+      });
       setStep("password");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur lors de la vérification.");

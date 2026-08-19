@@ -4,67 +4,112 @@ import path from "path";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { extractDocumentData } from "@/modules/kyc/kyc.service";
+import { getKycUserDir } from "@/modules/kyc/kyc-paths";
 
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "kyc");
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+];
 
 /**
  * POST /api/kyc/extract
  * Étape 1 du KYC : upload du recto du document + extraction OCR.
- * Retourne les champs extraits (nom, post-nom, prénom, date de naissance,
- * n° document, adresse) que l'utilisateur pourra corriger avant confirmation.
  */
 export async function POST(req: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) {
-    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-  }
-
-  const userId = session.user.id;
-
-  let formData: FormData;
   try {
-    formData = await req.formData();
-  } catch {
-    return NextResponse.json({ error: "Données invalides" }, { status: 400 });
-  }
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
 
-  const docFront = formData.get("docFront") as File | null;
-  if (!docFront) {
-    return NextResponse.json({ error: "Le recto du document est requis" }, { status: 400 });
-  }
-  if (docFront.size > MAX_FILE_SIZE) {
-    return NextResponse.json({ error: "Fichier trop volumineux (max 5 Mo)" }, { status: 400 });
-  }
-  if (!ALLOWED_TYPES.includes(docFront.type)) {
-    return NextResponse.json({ error: `Format non supporté : ${docFront.type}` }, { status: 400 });
-  }
+    const userId = session.user.id;
 
-  const userDir = path.join(UPLOAD_DIR, userId);
-  await mkdir(userDir, { recursive: true });
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "Impossible de lire la photo (fichier trop volumineux ou requête interrompue). Réessayez avec une image plus légère.",
+        },
+        { status: 400 },
+      );
+    }
 
-  const ext = docFront.name.split(".").pop() ?? "jpg";
-  const docPath = path.join(userDir, `doc_front.${ext}`);
-  const buffer = Buffer.from(await docFront.arrayBuffer());
-  await writeFile(docPath, buffer);
+    const docFront = formData.get("docFront") as File | null;
+    if (!docFront) {
+      return NextResponse.json(
+        { error: "Le recto du document est requis" },
+        { status: 400 },
+      );
+    }
+    if (docFront.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "Fichier trop volumineux (max 5 Mo)" },
+        { status: 400 },
+      );
+    }
 
-  try {
-    const extracted = await extractDocumentData(docPath);
-    // rawText interne — inutile côté client
-    const { rawText: _rawText, ...fields } = extracted;
+    const mime = (docFront.type || "").toLowerCase();
+    if (mime === "image/heic" || mime === "image/heif") {
+      return NextResponse.json(
+        {
+          error:
+            "Format HEIC non supporté. Dans Réglages iPhone → Appareil photo → Formats, choisissez « Plus compatible », ou exportez en JPEG.",
+        },
+        { status: 400 },
+      );
+    }
+    if (mime && !ALLOWED_TYPES.includes(mime)) {
+      return NextResponse.json(
+        { error: `Format non supporté : ${docFront.type || "inconnu"}` },
+        { status: 400 },
+      );
+    }
 
-    return NextResponse.json({
-      extracted: fields,
-      docSaved: true,
-    });
+    const userDir = getKycUserDir(userId);
+    await mkdir(userDir, { recursive: true });
+
+    const rawExt = docFront.name.split(".").pop()?.toLowerCase() || "jpg";
+    const ext = ["jpg", "jpeg", "png", "webp"].includes(rawExt) ? rawExt : "jpg";
+    const docPath = path.join(userDir, `doc_front.${ext}`);
+    const buffer = Buffer.from(await docFront.arrayBuffer());
+    await writeFile(docPath, buffer);
+
+    try {
+      const extracted = await extractDocumentData(docPath);
+      const { rawText: _rawText, ...fields } = extracted;
+
+      return NextResponse.json({
+        extracted: fields,
+        docSaved: true,
+      });
+    } catch (err) {
+      console.error("[KYC extract OCR]", err);
+      // Document sauvegardé — saisie manuelle possible
+      return NextResponse.json({
+        extracted: {},
+        docSaved: true,
+        extractionFailed: true,
+      });
+    }
   } catch (err) {
-    console.error("[KYC extract]", err);
-    // Le document est sauvegardé — l'utilisateur saisira les champs manuellement
-    return NextResponse.json({
-      extracted: {},
-      docSaved: true,
-      extractionFailed: true,
-    });
+    console.error("[KYC extract fatal]", err);
+    return NextResponse.json(
+      {
+        error:
+          "Erreur serveur lors de l'upload du document. Réessayez avec une photo plus petite (JPEG).",
+      },
+      { status: 500 },
+    );
   }
 }

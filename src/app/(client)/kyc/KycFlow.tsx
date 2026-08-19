@@ -71,11 +71,24 @@ export function KycFlow() {
     setLoading(true);
     setError("");
     try {
+      const { compressImageForUpload, readJsonResponse } = await import(
+        "@/lib/client-upload"
+      );
+      const compressed = await compressImageForUpload(docFile);
+      setDocFile(compressed);
+
       const formData = new FormData();
-      formData.append("docFront", docFile);
-      const res = await fetch("/api/kyc/extract", { method: "POST", body: formData });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
+      formData.append("docFront", compressed);
+      const res = await fetch("/api/kyc/extract", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const json = await readJsonResponse<{
+        error?: string;
+        extracted?: Partial<KycFields>;
+      }>(res);
+      if (!res.ok) throw new Error(json.error ?? "Échec de la lecture du document.");
 
       const ex = json.extracted ?? {};
       setFields({
@@ -112,11 +125,22 @@ export function KycFlow() {
       setError("Sélectionnez votre photo selfie.");
       return;
     }
+    if (!docFile) {
+      setError("Document manquant — revenez à l'étape photo du document.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
+      const { compressImageForUpload, readJsonResponse } = await import(
+        "@/lib/client-upload"
+      );
+      const selfie = await compressImageForUpload(selfieFile);
+      setSelfieFile(selfie);
+
       const formData = new FormData();
-      formData.append("selfie", selfieFile);
+      formData.append("selfie", selfie);
+      formData.append("docFront", docFile);
       formData.append("docType", docType);
       formData.append("firstName", fields.firstName);
       formData.append("lastName", fields.lastName);
@@ -128,14 +152,20 @@ export function KycFlow() {
       const res = await fetch("/api/kyc/verify-face", {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
+      const json = await readJsonResponse<{
+        error?: string;
+        approved?: boolean;
+        similarity?: number;
+        message?: string;
+      }>(res);
+      if (!res.ok) throw new Error(json.error ?? "Échec de la vérification.");
 
       setResult({
-        approved: json.approved,
-        similarity: json.similarity,
-        message: json.message,
+        approved: Boolean(json.approved),
+        similarity: json.similarity ?? 0,
+        message: json.message ?? "",
       });
       setStep("result");
     } catch (err: unknown) {

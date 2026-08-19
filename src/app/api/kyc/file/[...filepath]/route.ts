@@ -3,12 +3,13 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { getKycUploadRoot } from "@/modules/kyc/kyc-paths";
 
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "kyc");
+export const runtime = "nodejs";
 
 export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ filepath: string[] }> }
+  _req: NextRequest,
+  { params }: { params: Promise<{ filepath: string[] }> },
 ) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) {
@@ -27,8 +28,9 @@ export async function GET(
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
 
-  const safePath = path.join(UPLOAD_DIR, userId, ...rest);
-  if (!safePath.startsWith(UPLOAD_DIR)) {
+  const uploadDir = getKycUploadRoot();
+  const safePath = path.join(uploadDir, userId, ...rest);
+  if (!safePath.startsWith(uploadDir)) {
     return NextResponse.json({ error: "Chemin invalide" }, { status: 400 });
   }
 
