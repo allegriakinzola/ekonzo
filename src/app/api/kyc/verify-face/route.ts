@@ -18,13 +18,16 @@ const ALLOWED_TYPES = [
   "image/webp",
 ];
 
-function isUploadBlob(value: FormDataEntryValue | null): value is Blob {
+function isUploadFile(
+  value: FormDataEntryValue | null,
+): value is File {
   return (
     !!value &&
     typeof value === "object" &&
     "arrayBuffer" in value &&
     "size" in value &&
-    (value as Blob).size > 0
+    typeof (value as File).size === "number" &&
+    (value as File).size > 0
   );
 }
 
@@ -67,13 +70,13 @@ export async function POST(req: NextRequest) {
       (formData.get("docNumber") as string)?.trim() || undefined;
     const address = (formData.get("address") as string)?.trim() || undefined;
 
-    if (!isUploadBlob(selfieRaw)) {
+    if (!isUploadFile(selfieRaw)) {
       return NextResponse.json(
         { error: "Selfie requis (fichier image)." },
         { status: 400 },
       );
     }
-    if (!isUploadBlob(docFrontRaw)) {
+    if (!isUploadFile(docFrontRaw)) {
       return NextResponse.json(
         {
           error:
@@ -125,14 +128,8 @@ export async function POST(req: NextRequest) {
     const userDir = getKycUserDir(userId);
     await mkdir(userDir, { recursive: true });
 
-    const docName =
-      "name" in docFront && typeof docFront.name === "string"
-        ? docFront.name
-        : "doc_front.jpg";
-    const selfieName =
-      "name" in selfie && typeof selfie.name === "string"
-        ? selfie.name
-        : "selfie.jpg";
+    const docName = docFront.name || "doc_front.jpg";
+    const selfieName = selfie.name || "selfie.jpg";
 
     const docExtRaw = docName.split(".").pop()?.toLowerCase() || "jpg";
     const docExt = ["jpg", "jpeg", "png", "webp"].includes(docExtRaw)
