@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CarIcon,
@@ -46,6 +46,7 @@ export function KycFlow() {
   const [step, setStep] = useState<Step>("document");
   const [docType, setDocType] = useState<"CNI" | "PASSPORT" | "PERMIS">("CNI");
   const [docFile, setDocFile] = useState<File | null>(null);
+  const docFileRef = useRef<File | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [fields, setFields] = useState<KycFields>({
     firstName: "",
@@ -75,6 +76,7 @@ export function KycFlow() {
         "@/lib/client-upload"
       );
       const compressed = await compressImageForUpload(docFile);
+      docFileRef.current = compressed;
       setDocFile(compressed);
 
       const formData = new FormData();
@@ -125,7 +127,8 @@ export function KycFlow() {
       setError("Sélectionnez votre photo selfie.");
       return;
     }
-    if (!docFile) {
+    const recto = docFileRef.current ?? docFile;
+    if (!recto) {
       setError("Document manquant — revenez à l'étape photo du document.");
       return;
     }
@@ -135,12 +138,25 @@ export function KycFlow() {
       const { compressImageForUpload, readJsonResponse } = await import(
         "@/lib/client-upload"
       );
-      const selfie = await compressImageForUpload(selfieFile);
-      setSelfieFile(selfie);
+      const [docCompressed, selfieCompressed] = await Promise.all([
+        compressImageForUpload(recto),
+        compressImageForUpload(selfieFile),
+      ]);
+      docFileRef.current = docCompressed;
+      setDocFile(docCompressed);
+      setSelfieFile(selfieCompressed);
 
       const formData = new FormData();
-      formData.append("selfie", selfie);
-      formData.append("docFront", docFile);
+      formData.append(
+        "docFront",
+        docCompressed,
+        docCompressed.name || "doc_front.jpg",
+      );
+      formData.append(
+        "selfie",
+        selfieCompressed,
+        selfieCompressed.name || "selfie.jpg",
+      );
       formData.append("docType", docType);
       formData.append("firstName", fields.firstName);
       formData.append("lastName", fields.lastName);
@@ -297,7 +313,11 @@ export function KycFlow() {
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="h-11 pt-2"
-                onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  docFileRef.current = f;
+                  setDocFile(f);
+                }}
               />
               <p className="text-xs text-muted-foreground">
                 Photo nette, bien éclairée, texte lisible. Max 5 Mo.

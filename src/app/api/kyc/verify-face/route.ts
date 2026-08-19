@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir, readdir } from "fs/promises";
+import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -18,10 +18,20 @@ const ALLOWED_TYPES = [
   "image/webp",
 ];
 
+function isUploadBlob(value: FormDataEntryValue | null): value is Blob {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    "arrayBuffer" in value &&
+    "size" in value &&
+    (value as Blob).size > 0
+  );
+}
+
 /**
  * POST /api/kyc/verify-face
- * Étape 2 : selfie + (re)upload éventuel du recto — obligatoire sur Vercel
- * car /tmp de l'étape 1 n'est pas garanti sur une autre instance.
+ * Selfie + recto obligatoires (re-upload) — le disque /tmp Vercel
+ * n'est pas partagé entre les requêtes extract et verify-face.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -45,8 +55,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const selfie = formData.get("selfie") as File | null;
-    const docFront = formData.get("docFront") as File | null;
+    const selfieRaw = formData.get("selfie");
+    const docFrontRaw = formData.get("docFront");
     const docType = formData.get("docType") as KycDocType;
     const firstName = (formData.get("firstName") as string)?.trim();
     const lastName = (formData.get("lastName") as string)?.trim();
@@ -57,21 +67,57 @@ export async function POST(req: NextRequest) {
       (formData.get("docNumber") as string)?.trim() || undefined;
     const address = (formData.get("address") as string)?.trim() || undefined;
 
-    if (!selfie || !docType || !firstName || !lastName) {
+    if (!isUploadBlob(selfieRaw)) {
       return NextResponse.json(
-        { error: "Selfie, type de document, nom et prénom requis" },
+        { error: "Selfie requis (fichier image)." },
         { status: 400 },
       );
     }
-    if (selfie.size > MAX_FILE_SIZE) {
+    if (!isUploadBlob(docFrontRaw)) {
       return NextResponse.json(
-        { error: "Selfie trop volumineux (max 5 Mo)" },
+        {
+          error:
+            "Le recto du document est requis avec le selfie. Revenez à l'étape photo de la carte, puis réessayez.",
+        },
         { status: 400 },
       );
     }
-    if (selfie.type && !ALLOWED_TYPES.includes(selfie.type.toLowerCase())) {
+
+    const selfie = selfieRaw;
+    const docFront = docFrontRaw;
+
+    if (!docType || !firstName || !lastName) {
+      return NextResponse.json(
+        { error: "Type de document, nom et prénom requis" },
+        { status: 400 },
+      );
+    }
+    if (selfie.size > MAX_FILE_SIZE || docFront.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "Fichier trop volumineux (max 5 Mo par photo)" },
+        { status: 400 },
+      );
+    }
+
+    const selfieType = (selfie.type || "image/jpeg").toLowerCase();
+    const docTypeMime = (docFront.type || "image/jpeg").toLowerCase();
+    if (
+      selfieType &&
+      !ALLOWED_TYPES.includes(selfieType) &&
+      selfieType !== "application/octet-stream"
+    ) {
       return NextResponse.json(
         { error: `Format selfie non supporté : ${selfie.type}` },
+        { status: 400 },
+      );
+    }
+    if (
+      docTypeMime &&
+      !ALLOWED_TYPES.includes(docTypeMime) &&
+      docTypeMime !== "application/octet-stream"
+    ) {
+      return NextResponse.json(
+        { error: `Format document non supporté : ${docFront.type}` },
         { status: 400 },
       );
     }
@@ -79,46 +125,28 @@ export async function POST(req: NextRequest) {
     const userDir = getKycUserDir(userId);
     await mkdir(userDir, { recursive: true });
 
-    let docFrontPath: string;
+    const docName =
+      "name" in docFront && typeof docFront.name === "string"
+        ? docFront.name
+        : "doc_front.jpg";
+    const selfieName =
+      "name" in selfie && typeof selfie.name === "string"
+        ? selfie.name
+        : "selfie.jpg";
 
-    if (docFront && docFront.size > 0) {
-      if (docFront.size > MAX_FILE_SIZE) {
-        return NextResponse.json(
-          { error: "Document trop volumineux (max 5 Mo)" },
-          { status: 400 },
-        );
-      }
-      const rawExt = docFront.name.split(".").pop()?.toLowerCase() || "jpg";
-      const ext = ["jpg", "jpeg", "png", "webp"].includes(rawExt)
-        ? rawExt
-        : "jpg";
-      docFrontPath = path.join(userDir, `doc_front.${ext}`);
-      await writeFile(
-        docFrontPath,
-        Buffer.from(await docFront.arrayBuffer()),
-      );
-    } else {
-      try {
-        const files = await readdir(userDir);
-        const docFile = files.find((f) => f.startsWith("doc_front."));
-        if (!docFile) throw new Error("no doc");
-        docFrontPath = path.join(userDir, docFile);
-      } catch {
-        return NextResponse.json(
-          {
-            error:
-              "Document introuvable — recommencez l'étape d'upload du document",
-          },
-          { status: 400 },
-        );
-      }
-    }
-
-    const selfieExt = selfie.name.split(".").pop()?.toLowerCase() || "jpg";
-    const safeSelfieExt = ["jpg", "jpeg", "png", "webp"].includes(selfieExt)
-      ? selfieExt
+    const docExtRaw = docName.split(".").pop()?.toLowerCase() || "jpg";
+    const docExt = ["jpg", "jpeg", "png", "webp"].includes(docExtRaw)
+      ? docExtRaw
       : "jpg";
-    const selfiePath = path.join(userDir, `selfie.${safeSelfieExt}`);
+    const selfieExtRaw = selfieName.split(".").pop()?.toLowerCase() || "jpg";
+    const selfieExt = ["jpg", "jpeg", "png", "webp"].includes(selfieExtRaw)
+      ? selfieExtRaw
+      : "jpg";
+
+    const docFrontPath = path.join(userDir, `doc_front.${docExt}`);
+    const selfiePath = path.join(userDir, `selfie.${selfieExt}`);
+
+    await writeFile(docFrontPath, Buffer.from(await docFront.arrayBuffer()));
     await writeFile(selfiePath, Buffer.from(await selfie.arrayBuffer()));
 
     const result = await verifyFaceAndSubmit({

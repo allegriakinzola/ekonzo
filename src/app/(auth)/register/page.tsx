@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -86,6 +86,7 @@ export default function RegisterPage() {
   // État KYC
   const [docType, setDocType] = useState<"CNI" | "PASSPORT" | "PERMIS">("CNI");
   const [docFile, setDocFile] = useState<File | null>(null);
+  const docFileRef = useRef<File | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [fields, setFields] = useState<KycFields>({
     firstName: "", lastName: "", postName: "", dateOfBirth: "", docNumber: "", address: "",
@@ -144,6 +145,7 @@ export default function RegisterPage() {
         "@/lib/client-upload"
       );
       const compressed = await compressImageForUpload(docFile);
+      docFileRef.current = compressed;
       setDocFile(compressed);
 
       const formData = new FormData();
@@ -190,7 +192,8 @@ export default function RegisterPage() {
       setError("Sélectionnez votre photo selfie.");
       return;
     }
-    if (!docFile) {
+    const recto = docFileRef.current ?? docFile;
+    if (!recto) {
       setError("Document manquant — revenez à l'étape photo de la carte.");
       return;
     }
@@ -200,13 +203,19 @@ export default function RegisterPage() {
       const { compressImageForUpload, readJsonResponse } = await import(
         "@/lib/client-upload"
       );
-      const selfie = await compressImageForUpload(selfieFile);
-      setSelfieFile(selfie);
+      // Re-compresser les deux pour garantir < ~2 Mo au total (limite Vercel)
+      const [docCompressed, selfieCompressed] = await Promise.all([
+        compressImageForUpload(recto),
+        compressImageForUpload(selfieFile),
+      ]);
+      docFileRef.current = docCompressed;
+      setDocFile(docCompressed);
+      setSelfieFile(selfieCompressed);
 
       const formData = new FormData();
-      formData.append("selfie", selfie);
-      // Re-envoi du recto : obligatoire sur Vercel (stockage /tmp non partagé)
-      formData.append("docFront", docFile);
+      // Recto en premier — obligatoire sur Vercel
+      formData.append("docFront", docCompressed, docCompressed.name || "doc_front.jpg");
+      formData.append("selfie", selfieCompressed, selfieCompressed.name || "selfie.jpg");
       formData.append("docType", docType);
       formData.append("firstName", fields.firstName);
       formData.append("lastName", fields.lastName);
@@ -412,7 +421,11 @@ export default function RegisterPage() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   className="h-11 pt-2"
-                  onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    docFileRef.current = f;
+                    setDocFile(f);
+                  }}
                 />
                 <p className="text-xs text-muted-foreground">
                   Photo nette, bien éclairée, texte lisible. Max 5 Mo.
