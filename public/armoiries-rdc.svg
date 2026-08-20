@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" role="img" aria-label="Armoiries de la République Démocratique du Congo">
+  <!-- Emblème simplifié pour usage institutionnel (charte Marque État) -->
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f5d76e"/>
+      <stop offset="100%" stop-color="#c9a227"/>
+    </linearGradient>
+  </defs>
+  <!-- Bouclier -->
+  <path d="M100 18 L168 42 L168 118 C168 168 132 198 100 218 C68 198 32 168 32 118 L32 42 Z"
+        fill="#0095c9" stroke="#17418a" stroke-width="3"/>
+  <!-- Étoile -->
+  <path d="M100 58 L108 82 L134 82 L113 98 L121 122 L100 106 L79 122 L87 98 L66 82 L92 82 Z"
+        fill="#fff24b"/>
+  <!-- Tête de léopard stylisée -->
+  <ellipse cx="100" cy="145" rx="34" ry="28" fill="#c9a227"/>
+  <ellipse cx="88" cy="140" rx="5" ry="6" fill="#323230"/>
+  <ellipse cx="112" cy="140" rx="5" ry="6" fill="#323230"/>
+  <ellipse cx="100" cy="152" rx="8" ry="5" fill="#6b5854"/>
+  <!-- Ivoire / lance croisés -->
+  <line x1="48" y1="70" x2="152" y2="190" stroke="#afb8be" stroke-width="6" stroke-linecap="round"/>
+  <line x1="152" y1="70" x2="48" y2="190" stroke="#d4af37" stroke-width="6" stroke-linecap="round"/>
+  <!-- Ruban -->
+  <path d="M28 210 Q100 198 172 210 L168 226 Q100 214 32 226 Z" fill="#db3832"/>
+  <text x="100" y="220" text-anchor="middle" fill="#ffffff" font-family="Arial,sans-serif" font-size="9" font-weight="700" letter-spacing="0.5">JUSTICE · PAIX · TRAVAIL</text>
+</svg>

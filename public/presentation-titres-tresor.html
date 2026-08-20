@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ekonzo — Projet &amp; titres du Trésor | Ministère des Finances</title>
+  <!-- Cooper Hewitt : typographie principale de la Marque État Congolais -->
+  <link href="https://fonts.cdnfonts.com/css/cooper-hewitt" rel="stylesheet" />
+  <style>
+    /*
+      Charte graphique du Gouvernement de la RDC (fév. 2022)
+      Couleurs principales : #0095c9 · #fff24b · #db3832
+      Bleu institutionnel : #174899 / #17418a
+      Typo identité : Cooper Hewitt | Présentations : Arial (masque PPT)
+      Ligne d’État : verticale, parts égales, haut→bas Bleu / Jaune / Rouge
+    */
+    :root {
+      --bleu: #0095c9;
+      --jaune: #fff24b;
+      --rouge: #db3832;
+      --bleu-inst: #174899;
+      --bleu-fonce: #17418a;
+      --noir: #323230;
+      --gris: #6b5854;
+      --argent: #afb8be;
+      --blanc: #ffffff;
+      --fond: #ffffff;
+      --texte: #323230;
+      --muted: #5a5a58;
+      --x: 6px; /* largeur Ligne d’État (unité X) */
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: #e8eef5;
+      color: var(--texte);
+      font-family: Arial, Helvetica, sans-serif;
+      overflow: hidden;
+    }
+
+    .stage {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    /* Masque 16:9 — charte présentations */
+    .deck {
+      width: min(100vw - 2rem, calc((100vh - 2rem) * 16 / 9));
+      aspect-ratio: 16 / 9;
+      position: relative;
+      background: var(--fond);
+      box-shadow: 0 12px 40px rgba(23, 72, 153, 0.18);
+      overflow: hidden;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      background: var(--fond);
+      padding: 0;
+    }
+    .slide.active { display: flex; animation: in 0.28s ease; }
+
+    @keyframes in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* ——— En-tête Marque État ——— */
+    .brand-bar {
+      display: flex;
+      align-items: stretch;
+      gap: calc(var(--x) * 4); /* zone de sécurité 4X */
+      padding: 1.1rem 2rem 0.9rem;
+      border-bottom: 1px solid rgba(23, 72, 153, 0.12);
+      flex-shrink: 0;
+      background: var(--blanc);
+    }
+
+    /* Logo officiel Ministère des Finances (bloc-armoiries + Ligne d’État + intitulé) */
+    .logo-minfi {
+      height: 64px; /* ≥ 53 px digital — hauteur Ligne d’État */
+      width: auto;
+      max-width: min(420px, 55vw);
+      display: block;
+      object-fit: contain;
+      object-position: left center;
+      flex-shrink: 0;
+      align-self: center;
+    }
+
+    .brand-bar .spacer { flex: 1; }
+    .brand-bar .doc-meta {
+      align-self: center;
+      text-align: right;
+      font-size: 0.7rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .content {
+      flex: 1;
+      padding: 1.4rem 2.2rem 1.2rem;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .eyebrow {
+      font-family: "Cooper Hewitt", Arial, sans-serif;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--bleu-inst);
+      margin-bottom: 0.45rem;
+    }
+
+    h1, h2 {
+      font-family: "Cooper Hewitt", Arial, Helvetica, sans-serif;
+      font-weight: 700;
+      color: var(--bleu-fonce);
+      line-height: 1.15;
+    }
+    h1 {
+      font-size: clamp(1.7rem, 3.4vw, 2.55rem);
+      max-width: 18ch;
+      margin-bottom: 0.75rem;
+    }
+    h2 {
+      font-size: clamp(1.35rem, 2.6vw, 1.95rem);
+      margin-bottom: 0.55rem;
+    }
+
+    .lead {
+      font-size: clamp(0.92rem, 1.5vw, 1.1rem);
+      line-height: 1.5;
+      color: var(--texte);
+      max-width: 46rem;
+    }
+    .lead strong { color: var(--bleu-fonce); }
+
+    .footer-slide {
+      margin-top: auto;
+      padding-top: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.68rem;
+      color: var(--muted);
+      border-top: 1px solid rgba(23, 72, 153, 0.1);
+      padding-top: 0.65rem;
+    }
+    .footer-slide .stripe {
+      display: flex;
+      height: 3px;
+      width: 72px;
+      overflow: hidden;
+    }
+    .footer-slide .stripe i { flex: 1; display: block; }
+    .footer-slide .stripe i:nth-child(1) { background: var(--bleu); }
+    .footer-slide .stripe i:nth-child(2) { background: var(--jaune); }
+    .footer-slide .stripe i:nth-child(3) { background: var(--rouge); }
+
+    /* Cartes */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.9rem;
+      margin-top: 1.1rem;
+    }
+    .grid-4 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .card {
+      border: 1px solid rgba(23, 72, 153, 0.15);
+      border-left: 4px solid var(--bleu);
+      background: #f7fafc;
+      padding: 0.9rem 1rem;
+    }
+    .card.accent-y { border-left-color: #c9b422; }
+    .card.accent-r { border-left-color: var(--rouge); }
+    .card h3 {
+      font-family: "Cooper Hewitt", Arial, sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--bleu-fonce);
+      margin-bottom: 0.35rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .card p, .card li {
+      font-size: 0.86rem;
+      line-height: 1.45;
+      color: var(--texte);
+    }
+    .card ul {
+      list-style: none;
+      margin-top: 0.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.28rem;
+    }
+    .card li::before {
+      content: "–";
+      color: var(--bleu-inst);
+      margin-right: 0.4rem;
+      font-weight: 700;
+    }
+
+    /* Tableau */
+    .compare {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.84rem;
+    }
+    .compare th {
+      background: var(--bleu-inst);
+      color: var(--blanc);
+      font-family: "Cooper Hewitt", Arial, sans-serif;
+      font-weight: 600;
+      text-align: left;
+      padding: 0.55rem 0.75rem;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .compare td {
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid rgba(23, 72, 153, 0.12);
+      color: var(--texte);
+    }
+    .compare tr:nth-child(even) td { background: #f5f8fb; }
+    .compare td:first-child {
+      font-weight: 700;
+      color: var(--bleu-fonce);
+      width: 22%;
+    }
+
+    /* Étapes */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .agenda {
+      list-style: none;
+      margin-top: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+    .agenda li {
+      display: flex;
+      align-items: baseline;
+      gap: 0.85rem;
+      font-size: 1rem;
+      padding: 0.55rem 0.75rem;
+      background: #f5f8fb;
+      border-left: 4px solid var(--bleu);
+    }
+    .agenda li:nth-child(n+5) { border-left-color: #c9b422; }
+    .agenda .num {
+      font-family: "Cooper Hewitt", Arial, sans-serif;
+      font-weight: 700;
+      color: var(--bleu-inst);
+      min-width: 1.6rem;
+    }
+    .agenda .part {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    .section-tag {
+      display: inline-block;
+      font-family: "Cooper Hewitt", Arial, sans-serif;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.55rem;
+      background: rgba(23, 72, 153, 0.1);
+      color: var(--bleu-inst);
+      margin-bottom: 0.55rem;
+    }
+    .slide.cover .section-tag {
+      background: rgba(255, 242, 75, 0.2);
+      color: var(--jaune);
+    }
+
+    .card .cas {
+      margin-top: 0.55rem;
+      padding: 0.45rem 0.55rem;
+      background: rgba(23, 72, 153, 0.06);
+      border-left: 3px solid var(--bleu-inst);
+      font-size: 0.78rem;
+      line-height: 1.4;
+      color: var(--texte);
+      font-style: italic;
+    }
+    .card .cas strong {
+      font-style: normal;
+      color: var(--bleu-fonce);
+      display: block;
+      margin-bottom: 0.15rem;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .persona-name {
+      font-family: "Cooper Hewitt", Arial, sans-serif;
+      font-weight: 700;
+      color: var(--bleu-fonce);
+      font-size: 0.95rem;
+      text-transform: none !important;
+      letter-spacing: 0;
+      margin-bottom: 0.15rem;
+    }
+    .persona-role {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .ekonzo-mark {
+      font-family: "Cooper Hewitt", Arial, sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.55rem;
+      margin-top: 1.1rem;
+    }
+    .steps.steps-4 {
+      grid-template-columns: repeat(4, 1fr);
+    }
+    .step {
+      background: #f5f8fb;
+      border-top: 3px solid var(--bleu);
+      padding: 0.75rem 0.6rem;
+    }
+    .step:nth-child(2) { border-top-color: #c9b422; }
+    .step:nth-child(3) { border-top-color: var(--rouge); }
+    .step:nth-child(4) { border-top-color: var(--bleu); }
+    .step:nth-child(5) { border-top-color: #c9b422; }
+    .step .n {
+      font-family: "Cooper Hewitt", Arial, sans-serif;
+      font-weight: 700;
+      font-size: 1.15rem;
+      color: var(--bleu-inst);
+      margin-bottom: 0.3rem;
+    }
+    .step p {
+      font-size: 0.72rem;
+      line-height: 1.35;
+      color: var(--texte);
+    }
+
+    /* ——— Slide de couverture (fond bleu institutionnel) ——— */
+    .slide.cover {
+      background: var(--bleu-inst);
+      color: var(--blanc);
+    }
+    .slide.cover .brand-bar {
+      background: transparent;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .slide.cover .doc-meta { color: rgba(255, 255, 255, 0.7); }
+    .slide.cover .logo-minfi {
+      /* Fond bleu institutionnel : le logo officiel (fond sombre) reste lisible */
+      height: 72px;
+    }
+    .slide.cover h1 { color: var(--blanc); max-width: 16ch; }
+    .slide.cover .eyebrow { color: var(--jaune); }
+    .slide.cover .lead { color: rgba(255, 255, 255, 0.9); }
+    .slide.cover .footer-slide {
+      border-top-color: rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.65);
+    }
+
+    .cover-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0 2.2rem 1.5rem;
+    }
+
+    /* Nav */
+    .ui-nav {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      z-index: 20;
+      background: var(--blanc);
+      border: 1px solid rgba(23, 72, 153, 0.2);
+      border-radius: 4px;
+      padding: 0.35rem 0.5rem 0.35rem 0.75rem;
+      box-shadow: 0 4px 16px rgba(23, 72, 153, 0.12);
+    }
+    .ui-nav span {
+      font-family: "Cooper Hewitt", Arial, sans-serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--bleu-fonce);
+      font-variant-numeric: tabular-nums;
+    }
+    .ui-nav button {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: var(--bleu-inst);
+      color: var(--blanc);
+      font-size: 1.1rem;
+      cursor: pointer;
+      border-radius: 2px;
+      line-height: 1;
+    }
+    .ui-nav button:disabled { opacity: 0.35; cursor: default; }
+
+    .hint {
+      position: fixed;
+      bottom: 1.15rem;
+      left: 1rem;
+      font-size: 0.7rem;
+      color: #7a8694;
+      z-index: 20;
+    }
+
+    @media (max-width: 900px) {
+      .steps, .steps.steps-4 { grid-template-columns: repeat(2, 1fr); }
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .hint { display: none; }
+      .deck {
+        width: 100%;
+        aspect-ratio: auto;
+        height: 100%;
+        max-height: 100%;
+      }
+    }
+
+    @media print {
+      html, body { background: white; overflow: visible; height: auto; }
+      .stage { display: block; padding: 0; }
+      .deck { width: 100%; box-shadow: none; aspect-ratio: auto; }
+      .slide {
+        position: relative;
+        display: flex !important;
+        page-break-after: always;
+        min-height: 100vh;
+      }
+      .ui-nav, .hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="deck" id="deck">
+
+      <!-- 1. Couverture -->
+      <section class="slide cover active" data-i="0">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">République Démocratique<br />du Congo</div>
+        </header>
+        <div class="cover-body">
+          <p class="eyebrow">Présentation de projet</p>
+          <h1><span class="ekonzo-mark">ekonzo</span> — souscription digitale aux titres du Trésor</h1>
+          <p class="lead">
+            Théorie des Bons &amp; Obligations du Trésor, processus actuel d’achat,
+            puis digitalisation via ekonzo — avec ses contraintes réglementaires.
+          </p>
+        </div>
+        <div class="content" style="flex:0; padding-top:0;">
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Ministère des Finances · Plateforme ekonzo</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Agenda -->
+      <section class="slide" data-i="1">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Sommaire</div>
+        </header>
+        <div class="content">
+          <p class="eyebrow">Plan de la présentation</p>
+          <h2>Au programme</h2>
+          <ul class="agenda">
+            <li><span class="num">01</span> Théorie : titres, BT, OT<span class="part">Théorie</span></li>
+            <li><span class="num">02</span> Acheteurs actuels &amp; profils cibles<span class="part">Théorie</span></li>
+            <li><span class="num">03</span> Processus actuel d’achat (BT &amp; OT)<span class="part">Terrain</span></li>
+            <li><span class="num">04</span> Limites, digitalisation ekonzo<span class="part">Projet</span></li>
+            <li><span class="num">05</span> Contraintes qui demeurent<span class="part">Projet</span></li>
+            <li><span class="num">06</span> Parcours, paiements &amp; bénéfices<span class="part">Projet</span></li>
+          </ul>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>ekonzo · Ministère des Finances</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Théorie — titres -->
+      <section class="slide" data-i="2">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 1 · Théorie</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Théorie</span>
+          <h2>Qu’est-ce qu’un titre du Trésor&nbsp;?</h2>
+          <p class="lead">
+            C’est un <strong>prêt que vous faites à l’État</strong>. Le Ministère des Finances
+            s’engage à rembourser à une date précise, avec un rendement défini à l’émission.
+          </p>
+          <div class="grid-4">
+            <div class="card">
+              <h3>Émetteur</h3>
+              <p>L’État congolais, via le Ministère des Finances (Trésor public).</p>
+            </div>
+            <div class="card accent-y">
+              <h3>Garantie</h3>
+              <p>Engagement souverain. Titres dématérialisés, inscrits en comptes-titres.</p>
+            </div>
+            <div class="card accent-r">
+              <h3>Devises</h3>
+              <p>Émissions possibles en <strong>CDF</strong> ou en <strong>USD</strong>.</p>
+            </div>
+            <div class="card">
+              <h3>Cadre légal</h3>
+              <p>Décret n°18/025 du 11 juin 2018 — modalités d’émission et de remboursement.</p>
+            </div>
+          </div>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Titres publics · RDC</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. BT -->
+      <section class="slide" data-i="3">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 1 · Bons du Trésor</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Théorie</span>
+          <h2>Les Bons du Trésor (BT)</h2>
+          <p class="lead">
+            Titres à <strong>court terme</strong> pour financer les besoins de trésorerie de l’État.
+            Idéals pour une épargne de quelques mois — cœur de l’offre ekonzo aujourd’hui.
+          </p>
+          <div class="grid-2">
+            <div class="card">
+              <h3>Caractéristiques</h3>
+              <ul>
+                <li>Maturité ≤ <strong>12 mois</strong></li>
+                <li>Titres négociables et dématérialisés</li>
+                <li>Rendement par <strong>taux d’escompte</strong></li>
+                <li>Intérêts et capital à l’échéance</li>
+              </ul>
+            </div>
+            <div class="card accent-y">
+              <h3>Pour l’investisseur</h3>
+              <ul>
+                <li>Placement sûr, horizon court</li>
+                <li>Montants accessibles (dès 10&nbsp;000 CDF)</li>
+                <li>Souscription via canaux agréés</li>
+                <li>Garantie de l’État congolais</li>
+              </ul>
+            </div>
+          </div>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Théorie · Bons du Trésor</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. OT -->
+      <section class="slide" data-i="4">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 1 · Obligations du Trésor</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Théorie</span>
+          <h2>Les Obligations du Trésor (OT)</h2>
+          <p class="lead">
+            Titres à <strong>moyen / long terme</strong> (&gt; 12 mois). L’investisseur perçoit
+            des <strong>coupons</strong> (intérêts périodiques) jusqu’au remboursement du capital.
+          </p>
+          <div class="grid-2">
+            <div class="card">
+              <h3>Caractéristiques</h3>
+              <ul>
+                <li>Maturité <strong>supérieure à 12 mois</strong></li>
+                <li>Versement de coupons selon le calendrier</li>
+                <li>Capital remboursé à l’échéance</li>
+                <li>Outil de financement structurel de l’État</li>
+              </ul>
+            </div>
+            <div class="card accent-r">
+              <h3>Pour l’investisseur</h3>
+              <ul>
+                <li>Revenus périodiques prévisibles</li>
+                <li>Horizon d’épargne plus long</li>
+                <li>Profil institutionnel ou particulier avisé</li>
+                <li>Même garantie souveraine que les BT</li>
+              </ul>
+            </div>
+          </div>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Théorie · Obligations du Trésor</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. Comparaison -->
+      <section class="slide" data-i="5">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 1 · Synthèse</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Théorie</span>
+          <h2>BT vs OT — synthèse</h2>
+          <table class="compare">
+            <thead>
+              <tr>
+                <th>Critère</th>
+                <th>Bon du Trésor (BT)</th>
+                <th>Obligation du Trésor (OT)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Durée</td>
+                <td>Jusqu’à 12 mois</td>
+                <td>Plus de 12 mois</td>
+              </tr>
+              <tr>
+                <td>Rendement</td>
+                <td>Taux d’escompte (à l’échéance)</td>
+                <td>Coupons d’intérêts périodiques</td>
+              </tr>
+              <tr>
+                <td>Objectif État</td>
+                <td>Trésorerie</td>
+                <td>Financement moyen / long terme</td>
+              </tr>
+              <tr>
+                <td>Profil</td>
+                <td>Court terme, liquidité</td>
+                <td>Horizon long, revenus</td>
+              </tr>
+              <tr>
+                <td>Sécurité</td>
+                <td colspan="2">Garantie de l’État congolais dans les deux cas</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Fin de la synthèse BT / OT</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Acheteurs actuels : banques & assurances -->
+      <section class="slide" data-i="6">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 1 · Marché actuel</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Aujourd’hui · Avant digitalisation</span>
+          <h2>Qui achète vraiment auprès du Trésor&nbsp;?</h2>
+          <p class="lead" style="margin-bottom:0.4rem;">
+            Aujourd’hui, la <strong>grande majorité des BT et OT</strong> est souscrite par les
+            <strong>banques</strong> (et des <strong>assurances / institutionnels</strong> via le circuit bancaire) —
+            pas par le grand public.
+          </p>
+          <div class="grid-2">
+            <div class="card">
+              <h3 class="persona-name">Les banques</h3>
+              <p class="persona-role">Acheteurs directs aux adjudications · compte propre</p>
+              <p><strong>Besoin :</strong> placer la liquidité excédentaire (dépôts clients non encore prêtés).</p>
+              <p><strong>Motivation :</strong> rendement sûr, court terme (BT) ou structure de bilan (OT), actifs liquides pour la trésorerie.</p>
+              <div class="cas">
+                <strong>Exemple</strong>
+                Une banque a un surplus de trésorerie cette semaine → elle soumissionne à l’adjudication de BT 91 jours pour faire travailler ces fonds au lieu de les laisser stériles.
+              </div>
+            </div>
+            <div class="card accent-y">
+              <h3 class="persona-name">Les assurances (et assimilés)</h3>
+              <p class="persona-role">Institutionnels · souvent via banque / dépositaire</p>
+              <p><strong>Besoin :</strong> actifs «&nbsp;État&nbsp;» pour matcher des engagements longs (sinistres, rentes, contrats).</p>
+              <p><strong>Motivation :</strong> sécurité, coupons prévisibles (OT), durée alignée sur leurs passifs.</p>
+              <div class="cas">
+                <strong>Exemple</strong>
+                Une compagnie d’assurances place une partie de ses réserves techniques sur des OT 3–5 ans pour sécuriser le rendement et caler la durée de ses engagements.
+              </div>
+            </div>
+          </div>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Marché primaire actuel · banques &amp; institutionnels</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Exemples concrets banques / assurances -->
+      <section class="slide" data-i="7">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 1 · Exemples institutionnels</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Aujourd’hui · Cas types</span>
+          <h2>Exemples : banque vs assurance</h2>
+          <div class="grid-3">
+            <div class="card">
+              <h3 class="persona-name">Banque — compte propre (BT)</h3>
+              <p class="persona-role">Trésorerie bancaire</p>
+              <p>Excédent de dépôts à placer sur quelques semaines ou mois.</p>
+              <div class="cas">
+                <strong>Cas</strong>
+                Surplus de liquidité → adjudication BT 28 ou 91 jours → rendement + liquidité + risque État.
+              </div>
+            </div>
+            <div class="card accent-y">
+              <h3 class="persona-name">Banque — pour ses clients</h3>
+              <p class="persona-role">Intermédiation</p>
+              <p>Entreprises / gros clients passent ordre ; la banque soumissionne et inscrit les titres en compte-titres.</p>
+              <div class="cas">
+                <strong>Cas</strong>
+                Un importateur demande 2&nbsp;M USD de BT → la banque agrège l’ordre et le place à l’adjudication.
+              </div>
+            </div>
+            <div class="card accent-r">
+              <h3 class="persona-name">Assurance — OT</h3>
+              <p class="persona-role">Réserves techniques</p>
+              <p>Besoin de placement long, sûr, avec coupons pour ses engagements.</p>
+              <div class="cas">
+                <strong>Cas</strong>
+                Réserves placées en OT 3–5 ans via banque teneur de compte — pas d’achat «&nbsp;guichet grand public&nbsp;».
+              </div>
+            </div>
+          </div>
+          <p class="lead" style="margin-top:0.75rem; font-size:0.86rem;">
+            <strong>À retenir :</strong> le Trésor vend surtout à des acteurs qui ont déjà accès à l’adjudication
+            et au compte-titres. Le particulier reste en marge — c’est le vide qu’ekonzo vise.
+          </p>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Profils qui achètent aujourd’hui auprès du Trésor</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Profils cibles BT (demain / ekonzo) -->
+      <section class="slide" data-i="8">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 1 · Profils cibles BT</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Cibles ekonzo · Peu présents aujourd’hui</span>
+          <h2>Profils grand public (BT) — exemples cibles</h2>
+          <p class="lead" style="margin-bottom:0.35rem;">
+            Horizon <strong>court</strong> : ces profils existent en demande, mais passent rarement par le circuit actuel.
+          </p>
+          <div class="grid-3">
+            <div class="card">
+              <h3 class="persona-name">Marie, 34 ans</h3>
+              <p class="persona-role">Enseignante · Kinshasa</p>
+              <p>Veut faire fructifier sa prime / 13ᵉ mois sans le laisser sur le compte courant.</p>
+              <div class="cas">
+                <strong>Cas</strong>
+                Place 800&nbsp;000 CDF sur un BT 6 mois pour les frais scolaires de septembre.
+              </div>
+            </div>
+            <div class="card accent-y">
+              <h3 class="persona-name">Jean, 41 ans</h3>
+              <p class="persona-role">Commerçant importateur</p>
+              <p>A de la trésorerie entre deux commandes fournisseurs.</p>
+              <div class="cas">
+                <strong>Cas</strong>
+                Parque 5&nbsp;000&nbsp;000 CDF pendant 3 mois sur un BT, le temps d’attendre le prochain conteneur.
+              </div>
+            </div>
+            <div class="card accent-r">
+              <h3 class="persona-name">Grace, 29 ans</h3>
+              <p class="persona-role">Diaspora · Bruxelles</p>
+              <p>Veut un placement souverain lié à la RDC, simple et sécurisé.</p>
+              <div class="cas">
+                <strong>Cas</strong>
+                Souscrit 1&nbsp;000 USD sur un BT en dollar, via canal digital (cible ekonzo).
+              </div>
+            </div>
+          </div>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Profils BT à démocratiser</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Profils cibles OT -->
+      <section class="slide" data-i="9">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 1 · Profils cibles OT</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Cibles ekonzo · Complément long terme</span>
+          <h2>Profils grand public / PME (OT) — exemples cibles</h2>
+          <p class="lead" style="margin-bottom:0.35rem;">
+            Horizon <strong>moyen / long</strong> : aujourd’hui surtout assurances &amp; banques ; demain aussi particuliers avertis et PME.
+          </p>
+          <div class="grid-3">
+            <div class="card">
+              <h3 class="persona-name">Paul, 52 ans</h3>
+              <p class="persona-role">Cadre · prépare les études de ses enfants</p>
+              <p>Cherche des revenus réguliers sur plusieurs années.</p>
+              <div class="cas">
+                <strong>Cas</strong>
+                Place 10&nbsp;000 USD sur une OT 3 ans avec coupons semestriels pour anticiper les frais universitaires.
+              </div>
+            </div>
+            <div class="card accent-y">
+              <h3 class="persona-name">SARL «&nbsp;Kivu Trade&nbsp;»</h3>
+              <p class="persona-role">PME · réserves d’entreprise</p>
+              <p>Fonds stables non utilisés immédiatement dans le cycle d’exploitation.</p>
+              <div class="cas">
+                <strong>Cas</strong>
+                Investit une partie des réserves sur une OT 2–5 ans plutôt que de tout laisser en cash.
+              </div>
+            </div>
+            <div class="card accent-r">
+              <h3 class="persona-name">Rappel marché actuel</h3>
+              <p class="persona-role">Assurance · banque</p>
+              <p>Ce sont encore eux qui portent l’essentiel des volumes OT auprès du Trésor.</p>
+              <div class="cas">
+                <strong>Cas</strong>
+                Assurance : réserves en OT 3–5 ans · Banque : OT pour bilan / clients institutionnels.
+              </div>
+            </div>
+          </div>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>OT · institutionnels aujourd’hui · grand public demain</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Processus actuel -->
+      <section class="slide" data-i="10">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 2 · Processus actuel</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Terrain · Aujourd’hui</span>
+          <h2>Comment on achète un BT ou une OT aujourd’hui</h2>
+          <p class="lead">
+            Pour les <strong>Bons</strong> comme pour les <strong>Obligations</strong>, le circuit
+            reste centré sur la banque : l’adjudication est ouverte aux banques ;
+            le particulier passe presque toujours par un guichet.
+          </p>
+          <div class="steps">
+            <div class="step">
+              <div class="n">01</div>
+              <p><strong>Banque</strong><br />Se rendre en agence / être client</p>
+            </div>
+            <div class="step">
+              <div class="n">02</div>
+              <p><strong>Compte-titres</strong><br />Ouverture obligatoire (loi 22/069)</p>
+            </div>
+            <div class="step">
+              <div class="n">03</div>
+              <p><strong>Dossier</strong><br />KYC papier, formulaires, signatures</p>
+            </div>
+            <div class="step">
+              <div class="n">04</div>
+              <p><strong>Ordre</strong><br />Instruction d’achat BT ou OT</p>
+            </div>
+            <div class="step">
+              <div class="n">05</div>
+              <p><strong>Adjudication</strong><br />La banque place l’ordre au Trésor</p>
+            </div>
+          </div>
+          <p class="lead" style="margin-top:0.85rem; font-size:0.86rem;">
+            Le titre est ensuite inscrit sur le <strong>compte-titres</strong> tenu par la banque
+            (teneur de compte agréé BCC) — pas sur un «&nbsp;compte ekonzo&nbsp;».
+          </p>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Circuit bancaire traditionnel · BT &amp; OT</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. Contres du processus actuel -->
+      <section class="slide" data-i="7">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 2 · Limites</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Terrain · Contres</span>
+          <h2>Pourquoi ce processus freine l’accès</h2>
+          <div class="grid-2">
+            <div class="card accent-r">
+              <h3>Pour le citoyen</h3>
+              <ul>
+                <li>Obligation d’avoir un <strong>compte-titres bancaire</strong></li>
+                <li>Déplacements, files d’attente, horaires d’agence</li>
+                <li>Dossier papier long (KYC, convention, ordres)</li>
+                <li>Seuils et frais bancaires parfois dissuasifs</li>
+                <li>Peu d’information claire sur les émissions ouvertes</li>
+                <li>Difficile pour la diaspora et les non-bancarisés</li>
+              </ul>
+            </div>
+            <div class="card accent-y">
+              <h3>Pour le Trésor / l’État</h3>
+              <ul>
+                <li>Base d’investisseurs limitée aux clients bancaires</li>
+                <li>Faible mobilisation de l’épargne populaire</li>
+                <li>Peu de traçabilité digitale côté particulier</li>
+                <li>Image d’un produit «&nbsp;réservé aux initiés&nbsp;»</li>
+                <li>Canal de collecte peu adapté au Mobile Money</li>
+              </ul>
+            </div>
+          </div>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Freins à l’inclusion financière</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9. Ce que ekonzo digitalise -->
+      <section class="slide" data-i="8">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 3 · Digitalisation</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Projet ekonzo</span>
+          <h2>Ce que nous voulons digitaliser</h2>
+          <p class="lead">
+            <strong>ekonzo</strong> = canal digital de collecte et d’accompagnement :
+            le citoyen souscrit en ligne ; la banque partenaire reste le teneur de compte-titres.
+          </p>
+          <div class="grid-2">
+            <div class="card">
+              <h3>À digitaliser</h3>
+              <ul>
+                <li>Inscription &amp; authentification (téléphone + OTP)</li>
+                <li>KYC à distance (pièce + selfie)</li>
+                <li>Signature électronique de la convention compte-titres</li>
+                <li>Catalogue des émissions BT (puis OT)</li>
+                <li>Paiement Mobile Money / virement</li>
+                <li>Suivi du portefeuille &amp; dossier CIF pour la banque</li>
+              </ul>
+            </div>
+            <div class="card accent-y">
+              <h3>Ce qui reste bancaire / Trésor</h3>
+              <ul>
+                <li>Tenue du <strong>compte-titres</strong> (banque agréée BCC)</li>
+                <li>Participation à l’<strong>adjudication</strong></li>
+                <li>Règlement–livraison des titres</li>
+                <li>Calendrier et conditions d’émission (Ministère)</li>
+              </ul>
+            </div>
+          </div>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Digitaliser le parcours citoyen, pas remplacer la banque</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 10. Avant / après -->
+      <section class="slide" data-i="9">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 3 · Avant / après</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Projet ekonzo</span>
+          <h2>Processus actuel vs parcours ekonzo</h2>
+          <table class="compare">
+            <thead>
+              <tr>
+                <th>Étape</th>
+                <th>Aujourd’hui (banque)</th>
+                <th>Avec ekonzo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Accès</td>
+                <td>Agence, clientèle bancaire</td>
+                <td>Web / mobile, 24h/24</td>
+              </tr>
+              <tr>
+                <td>Identité</td>
+                <td>KYC papier en agence</td>
+                <td>KYC digital (pièce + selfie)</td>
+              </tr>
+              <tr>
+                <td>Compte-titres</td>
+                <td>Ouverture longue en banque</td>
+                <td>Convention signée en ligne → banque partenaire</td>
+              </tr>
+              <tr>
+                <td>Ordre BT / OT</td>
+                <td>Formulaire / guichet</td>
+                <td>Choix d’émission + paiement en ligne</td>
+              </tr>
+              <tr>
+                <td>Paiement</td>
+                <td>Compte bancaire / caisse</td>
+                <td>MoMo (Airtel, Orange, M-Pesa) ou virement</td>
+              </tr>
+              <tr>
+                <td>Suivi</td>
+                <td>Relevés bancaires</td>
+                <td>Tableau de bord investisseur</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Même titre d’État · parcours citoyen modernisé</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 11. Contraintes qui demeurent -->
+      <section class="slide" data-i="10">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 3 · Contraintes</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Projet · Cadre légal</span>
+          <h2>Contraintes que ekonzo ne peut pas lever seul</h2>
+          <p class="lead" style="margin-bottom:0.75rem;">
+            La digitalisation accélère le parcours, mais certaines règles restent intangibles.
+          </p>
+          <div class="grid-2">
+            <div class="card accent-r">
+              <h3>Contraintes majeures</h3>
+              <ul>
+                <li><strong>Compte-titres obligatoire</strong> chez une banque / établissement agréé BCC (loi n°22/069)</li>
+                <li>ekonzo <strong>n’est pas teneur de compte-titres</strong> : le titre reste chez la banque partenaire</li>
+                <li>L’<strong>adjudication</strong> reste un processus Trésor / banques</li>
+                <li>Convention écrite + instruction BCC pour le compte-titres</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Autres points de vigilance</h3>
+              <ul>
+                <li>Dépendance à un <strong>partenariat bancaire</strong> (ex. Equity BCDC)</li>
+                <li>KYC / AML obligatoires avant toute souscription</li>
+                <li>Arrêté ministériel utile pour cadrer le canal digital (décret 18/025 art. 6)</li>
+                <li>Éducation financière : expliquer BT vs OT au grand public</li>
+                <li>Disponibilité réseau / Mobile Money pour finaliser le paiement</li>
+              </ul>
+            </div>
+          </div>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Transparence sur ce qui change… et ce qui ne change pas</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 12. Parcours ekonzo -->
+      <section class="slide" data-i="11">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 3 · Parcours ekonzo</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Projet ekonzo</span>
+          <h2>Parcours digital cible</h2>
+          <p class="lead">De l’inscription à la détention du titre, sans file d’attente en agence.</p>
+          <div class="steps">
+            <div class="step">
+              <div class="n">01</div>
+              <p><strong>Compte</strong><br />Téléphone + OTP</p>
+            </div>
+            <div class="step">
+              <div class="n">02</div>
+              <p><strong>KYC</strong><br />Pièce d’identité &amp; selfie</p>
+            </div>
+            <div class="step">
+              <div class="n">03</div>
+              <p><strong>Convention</strong><br />Compte-titres (banque partenaire)</p>
+            </div>
+            <div class="step">
+              <div class="n">04</div>
+              <p><strong>Souscription</strong><br />BT (puis OT) + paiement</p>
+            </div>
+            <div class="step">
+              <div class="n">05</div>
+              <p><strong>Titre</strong><br />Adjudication via la banque</p>
+            </div>
+          </div>
+          <p class="lead" style="margin-top:1rem; font-size:0.88rem;">
+            Le dossier client (CIF) est transmis à la banque pour ouverture / tenue du compte-titres.
+          </p>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Parcours digital · conformité bancaire respectée</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 13. Publics & paiements -->
+      <section class="slide" data-i="12">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 3 · Cibles &amp; paiements</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Projet ekonzo</span>
+          <h2>Pour qui&nbsp;? Comment payer&nbsp;?</h2>
+          <div class="grid-3">
+            <div class="card">
+              <h3>Particuliers</h3>
+              <p>Épargne sur titres d’État, depuis le Mobile Money — sans parcours 100&nbsp;% papier.</p>
+            </div>
+            <div class="card accent-y">
+              <h3>Professionnels</h3>
+              <p>Placer la trésorerie sur des instruments publics réglementés.</p>
+            </div>
+            <div class="card accent-r">
+              <h3>Diaspora</h3>
+              <p>Accéder aux BT / OT sans devoir être physiquement en agence à Kinshasa.</p>
+            </div>
+          </div>
+          <div class="grid-4" style="margin-top:0.85rem;">
+            <div class="card"><h3>Airtel Money</h3><p>Paiement via prompt USSD.</p></div>
+            <div class="card"><h3>Orange Money</h3><p>Souscription en quelques secondes.</p></div>
+            <div class="card"><h3>M-Pesa</h3><p>Paiement Mobile Money sécurisé.</p></div>
+            <div class="card"><h3>Virement</h3><p>Transfert bancaire avec référence.</p></div>
+          </div>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Inclusion financière · Canaux digitaux</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 14. Bénéfices -->
+      <section class="slide" data-i="13">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Partie 3 · Impact</div>
+        </header>
+        <div class="content">
+          <span class="section-tag">Projet ekonzo</span>
+          <h2>Bénéfices attendus</h2>
+          <div class="grid-2">
+            <div class="card">
+              <h3>Pour le citoyen</h3>
+              <ul>
+                <li>Moins de déplacements, parcours clair</li>
+                <li>Épargne sûre, traçable, suivie en ligne</li>
+                <li>Paiement Mobile Money familier</li>
+                <li>Accès progressif BT puis OT</li>
+              </ul>
+            </div>
+            <div class="card accent-y">
+              <h3>Pour l’État</h3>
+              <ul>
+                <li>Élargissement de la base d’investisseurs</li>
+                <li>Mobilisation de l’épargne nationale</li>
+                <li>Canal digital auditable (CIF, KYC)</li>
+                <li>Modernisation Trésor–citoyen, dans le cadre légal</li>
+              </ul>
+            </div>
+          </div>
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>Impact citoyen &amp; Trésor public</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 15. Clôture -->
+      <section class="slide cover" data-i="14">
+        <header class="brand-bar">
+          <img class="logo-minfi" src="/logo.webp" alt="Ministère des Finances — République Démocratique du Congo" />
+          <div class="spacer"></div>
+          <div class="doc-meta">Gouvernement de la République</div>
+        </header>
+        <div class="cover-body">
+          <p class="eyebrow">Conclusion</p>
+          <h1>Digitaliser l’accès, respecter le cadre bancaire</h1>
+          <p class="lead">
+            ekonzo modernise le parcours d’achat des BT et OT, tout en conservant
+            le compte-titres et l’adjudication chez la banque partenaire —
+            pour un Trésor plus accessible, sans court-circuiter la loi.
+          </p>
+          <p class="lead" style="margin-top:1.25rem; font-size:1rem;">
+            Merci de votre attention · Questions&nbsp;?
+          </p>
+        </div>
+        <div class="content" style="flex:0; padding-top:0;">
+          <div class="footer-slide">
+            <div class="stripe"><i></i><i></i><i></i></div>
+            <span>ekonzo · Ministère des Finances · Kinshasa, RDC</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <p class="hint">← → ou Espace pour naviguer</p>
+  <div class="ui-nav">
+    <span id="counter">1 / 19</span>
+    <button type="button" id="prev" aria-label="Précédent">‹</button>
+    <button type="button" id="next" aria-label="Suivant">›</button>
+  </div>
+
+  <script>
+    const slides = [...document.querySelectorAll(".slide")];
+    let i = 0;
+
+    function show(n) {
+      i = Math.max(0, Math.min(slides.length - 1, n));
+      slides.forEach((s, idx) => s.classList.toggle("active", idx === i));
+      document.getElementById("counter").textContent = `${i + 1} / ${slides.length}`;
+      document.getElementById("prev").disabled = i === 0;
+      document.getElementById("next").disabled = i === slides.length - 1;
+    }
+
+    document.getElementById("prev").onclick = () => show(i - 1);
+    document.getElementById("next").onclick = () => show(i + 1);
+
+    document.addEventListener("keydown", (e) => {
+      if (["ArrowRight", "ArrowDown", " ", "PageDown"].includes(e.key)) {
+        e.preventDefault();
+        show(i + 1);
+      }
+      if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) {
+        e.preventDefault();
+        show(i - 1);
+      }
+      if (e.key === "Home") show(0);
+      if (e.key === "End") show(slides.length - 1);
+    });
+
+    show(0);
+  </script>
+</body>
+</html>

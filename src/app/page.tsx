@@ -199,40 +199,41 @@ export default function HomePage() {
           />
         </div>
 
-        <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-12 sm:pt-16 lg:px-6 lg:pb-24 lg:pt-24">
-          <div className="grid items-center gap-12 sm:gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+        <div className="relative mx-auto max-w-6xl px-4 pb-12 pt-8 sm:px-5 sm:pb-16 sm:pt-16 lg:px-6 lg:pb-24 lg:pt-24">
+          <div className="grid items-center gap-8 sm:gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
             {/* Colonne texte */}
-            <div className="space-y-6 sm:space-y-8">
-              <div className="inline-flex max-w-full items-center gap-2.5 rounded-full border border-white/15 bg-white/[0.06] py-1.5 pl-2 pr-3.5 text-[11px] font-medium text-white/85 backdrop-blur-sm sm:text-xs">
-                <span className="flex h-5 items-center rounded-full bg-yellow-400/15 px-2 text-[10px] font-bold uppercase tracking-wider text-yellow-300">
+            <div className="min-w-0 space-y-5 sm:space-y-8">
+              <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] py-1.5 pl-2 pr-3 text-[11px] font-medium text-white/85 backdrop-blur-sm sm:gap-2.5 sm:pr-3.5 sm:text-xs">
+                <span className="shrink-0 flex h-5 items-center rounded-full bg-yellow-400/15 px-2 text-[10px] font-bold uppercase tracking-wider text-yellow-300">
                   Officiel
                 </span>
-                <span className="truncate">
+                <span className="min-w-0 sm:hidden">
+                  Ministère des Finances · RDC
+                </span>
+                <span className="hidden min-w-0 sm:inline">
                   Ministère des Finances · République Démocratique du Congo
                 </span>
               </div>
 
-              <div className="space-y-4 sm:space-y-5">
-                <h1 className="text-[2.1rem] font-bold leading-[1.08] tracking-[-0.02em] sm:text-[2.75rem] md:text-5xl lg:text-[3.5rem]">
-                  L&apos;épargne qui
-                  <br />
-                  construit le pays,
-                  <br />
+              <div className="space-y-3 sm:space-y-5">
+                <h1 className="text-balance text-[1.7rem] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[2.75rem] md:text-5xl lg:text-[3.5rem]">
+                  L&apos;épargne qui construit le pays,{" "}
                   <span className="bg-gradient-to-r from-yellow-300 via-yellow-200 to-yellow-400 bg-clip-text text-transparent">
                     à votre portée.
                   </span>
                 </h1>
-                <p className="max-w-md text-[15px] leading-relaxed text-slate-300 sm:text-base">
+                <p className="max-w-md text-pretty text-[14px] leading-relaxed text-slate-300 sm:text-base">
                   Souscrivez aux Bons du Trésor de la RDC depuis votre
-                  téléphone. Rendement garanti par l&apos;État, paiement Mobile
-                  Money, dès 100 USD.
+                  téléphone. Rendement garanti par l&apos;État, paiement{" "}
+                  <span className="whitespace-nowrap">Mobile&nbsp;Money</span>,
+                  dès 100&nbsp;USD.
                 </p>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex w-full flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
                 <Link
                   href="/register"
-                  className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-6 text-sm font-bold text-slate-950 shadow-[0_8px_30px_rgb(0_0_0/0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_36px_rgb(0_0_0/0.45)] sm:px-7"
+                  className="group inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-slate-950 shadow-[0_8px_30px_rgb(0_0_0/0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_36px_rgb(0_0_0/0.45)] sm:h-12 sm:w-auto sm:px-7"
                 >
                   Ouvrir mon compte
                   <span
@@ -244,31 +245,31 @@ export default function HomePage() {
                 </Link>
                 <a
                   href="#fonctionnement"
-                  className="inline-flex h-12 items-center justify-center rounded-xl border border-white/20 bg-white/[0.03] px-6 text-sm font-semibold text-white/90 backdrop-blur-sm transition-colors hover:border-white/35 hover:bg-white/[0.08] sm:px-7"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-white/20 bg-white/[0.03] px-5 text-sm font-semibold text-white/90 backdrop-blur-sm transition-colors hover:border-white/35 hover:bg-white/[0.08] sm:h-12 sm:w-auto sm:px-7"
                 >
                   Comment ça marche
                 </a>
               </div>
 
               {/* Preuves de confiance */}
-              <div className="flex items-center gap-4 border-t border-white/10 pt-5 sm:gap-6">
-                <div className="flex items-center gap-2.5">
+              <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-4 sm:flex sm:items-center sm:gap-6 sm:pt-5">
+                <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
                   <Image
                     src="/logo.webp"
                     alt=""
                     width={34}
                     height={34}
-                    className="rounded-lg bg-white object-contain p-1"
+                    className="h-8 w-8 shrink-0 rounded-lg bg-white object-contain p-1 sm:h-[34px] sm:w-[34px]"
                   />
-                  <p className="text-xs leading-tight text-slate-300">
+                  <p className="min-w-0 text-[11px] leading-tight text-slate-300 sm:text-xs">
                     <span className="block font-semibold text-white">
                       Ministère des Finances
                     </span>
                     Plateforme sous tutelle
                   </p>
                 </div>
-                <div className="h-8 w-px bg-white/10" aria-hidden />
-                <p className="text-xs leading-tight text-slate-300">
+                <div className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
+                <p className="min-w-0 text-[11px] leading-tight text-slate-300 sm:text-xs">
                   <span className="block font-semibold text-white">
                     Cadre BCC
                   </span>
@@ -278,41 +279,41 @@ export default function HomePage() {
             </div>
 
             {/* Colonne visuelle */}
-            <div className="relative mx-auto w-full max-w-[380px] lg:max-w-none lg:justify-self-end">
-              <div className="relative mx-auto aspect-[4/5] w-full max-w-[320px] sm:max-w-[360px]">
-                {/* Cadre décoratif décalé */}
+            <div className="relative mx-auto w-full max-w-[min(100%,340px)] px-2 sm:max-w-[380px] sm:px-0 lg:max-w-none lg:justify-self-end">
+              <div className="relative mx-auto aspect-[4/5] w-full max-w-[280px] sm:max-w-[360px]">
+                {/* Cadre décoratif décalé — contenu dans le flux sur mobile */}
                 <div
-                  className="absolute -inset-3 rounded-[2rem] border border-white/10 sm:-inset-4"
+                  className="absolute inset-0 rounded-[1.75rem] border border-white/10 sm:-inset-4 sm:rounded-[2rem]"
                   aria-hidden
                 />
                 <div
-                  className="absolute -right-3 -top-3 h-24 w-24 rounded-tr-[2rem] border-r-2 border-t-2 border-yellow-400/60 sm:-right-4 sm:-top-4"
+                  className="absolute -right-1 -top-1 h-16 w-16 rounded-tr-[1.5rem] border-r-2 border-t-2 border-yellow-400/60 sm:-right-4 sm:-top-4 sm:h-24 sm:w-24 sm:rounded-tr-[2rem]"
                   aria-hidden
                 />
                 <div
-                  className="absolute -bottom-3 -left-3 h-24 w-24 rounded-bl-[2rem] border-b-2 border-l-2 border-primary/70 sm:-bottom-4 sm:-left-4"
+                  className="absolute -bottom-1 -left-1 h-16 w-16 rounded-bl-[1.5rem] border-b-2 border-l-2 border-primary/70 sm:-bottom-4 sm:-left-4 sm:h-24 sm:w-24 sm:rounded-bl-[2rem]"
                   aria-hidden
                 />
 
-                <div className="relative h-full w-full overflow-hidden rounded-[1.75rem] shadow-2xl shadow-black/50 ring-1 ring-white/15">
+                <div className="relative h-full w-full overflow-hidden rounded-[1.5rem] shadow-2xl shadow-black/50 ring-1 ring-white/15 sm:rounded-[1.75rem]">
                   <Image
                     src="/ekonzophoto.jpg"
                     alt="Investisseuse ekonzo"
                     fill
-                    sizes="(max-width: 640px) 320px, 360px"
+                    sizes="(max-width: 640px) 280px, 360px"
                     className="object-cover object-center"
                     priority
                   />
                   <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-slate-950/80 to-transparent" />
 
                   {/* Carte taux intégrée */}
-                  <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/15 bg-slate-950/70 p-3.5 backdrop-blur-md sm:inset-x-4 sm:bottom-4 sm:p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
+                  <div className="absolute inset-x-2.5 bottom-2.5 rounded-xl border border-white/15 bg-slate-950/70 p-3 backdrop-blur-md sm:inset-x-4 sm:bottom-4 sm:rounded-2xl sm:p-4">
+                    <div className="flex items-center justify-between gap-2 sm:gap-3">
+                      <div className="min-w-0">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                           Bon du Trésor · 26 semaines
                         </p>
-                        <p className="mt-1 text-2xl font-black tracking-tight text-white sm:text-[1.75rem]">
+                        <p className="mt-1 text-xl font-black tracking-tight text-white sm:text-[1.75rem]">
                           8,50{" "}
                           <span className="text-base font-bold text-yellow-300">
                             %
@@ -322,7 +323,7 @@ export default function HomePage() {
                           Taux annuel brut · dès 100 USD
                         </p>
                       </div>
-                      <div className="flex flex-col items-end gap-1.5">
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
                         <span className="rounded-full border border-emerald-400/30 bg-emerald-400/15 px-2.5 py-0.5 text-[10px] font-bold text-emerald-300">
                           ● Ouvert
                         </span>
@@ -337,12 +338,12 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Pastille paiement */}
-                <div className="absolute -left-2 top-6 flex items-center gap-2 rounded-xl border border-white/15 bg-slate-950/80 py-2 pl-2.5 pr-3.5 text-[11px] font-semibold text-white shadow-xl backdrop-blur-md sm:-left-8 sm:top-9">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-400/15 text-xs text-emerald-300">
+                {/* Pastille paiement — pas de débordement hors écran */}
+                <div className="absolute left-1 top-4 flex max-w-[calc(100%-0.5rem)] items-center gap-2 rounded-xl border border-white/15 bg-slate-950/80 py-1.5 pl-2 pr-2.5 text-[10px] font-semibold text-white shadow-xl backdrop-blur-md sm:-left-8 sm:top-9 sm:max-w-none sm:py-2 sm:pl-2.5 sm:pr-3.5 sm:text-[11px]">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-400/15 text-xs text-emerald-300">
                     ✓
                   </span>
-                  <span className="leading-tight">
+                  <span className="min-w-0 leading-tight">
                     Paiement confirmé
                     <span className="block text-[10px] font-medium text-slate-400">
                       Mobile Money · USSD
@@ -354,7 +355,7 @@ export default function HomePage() {
           </div>
 
           {/* Bandeau de chiffres clés */}
-          <div className="mt-14 grid grid-cols-2 divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm sm:mt-16 lg:mt-20 lg:grid-cols-4 lg:divide-x">
+          <div className="mt-10 grid grid-cols-2 divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm sm:mt-16 lg:mt-20 lg:grid-cols-4 lg:divide-x">
             {[
               { val: "100 %", label: "Garanti par l'État congolais" },
               { val: "4 – 52 sem.", label: "Durées des Bons du Trésor" },
