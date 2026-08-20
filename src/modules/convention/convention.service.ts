@@ -12,6 +12,7 @@ import { buildSignatureHash, generateConventionPdf } from "./convention.pdf";
 import {
   getAvailablePartnerBanks,
   getPartnerBankByCode,
+  type PartnerBank,
 } from "./partner-banks";
 
 export type SignatureMethod = "TYPED" | "DRAWN";
@@ -146,15 +147,14 @@ export async function regenerateAgreementPdf(agreement: {
   signatureImageBase64?: string | null;
   pdfBase64?: string | null;
 }): Promise<Buffer> {
-  const bank =
-    getPartnerBankByCode(agreement.partnerBankCode) ??
-    ({
+  const bank: PartnerBank =
+    getPartnerBankByCode(agreement.partnerBankCode) ?? {
       code: agreement.partnerBankCode,
       name: agreement.partnerBankName,
       shortName: agreement.partnerBankName,
       logoSrc: "/logoequity.png",
       available: true,
-    } as const);
+    };
 
   const user = await prisma.user.findUnique({
     where: { id: agreement.userId },
@@ -175,8 +175,8 @@ export async function regenerateAgreementPdf(agreement: {
     title: convention?.title ?? CONVENTION_TITLE,
     version: convention?.version ?? CONVENTION_VERSION,
     partnerBankName: bank.name,
-    partnerBankShortName: "shortName" in bank ? bank.shortName : bank.name,
-    partnerBankLogoSrc: "logoSrc" in bank ? bank.logoSrc : "/logoequity.png",
+    partnerBankShortName: bank.shortName,
+    partnerBankLogoSrc: bank.logoSrc,
     bodyMarkdown,
     signedName: agreement.signedName,
     userId: agreement.userId,

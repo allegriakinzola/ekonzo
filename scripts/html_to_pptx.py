@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Hors du dépôt git (sibling de ekonzo-web)
 OUT_DIR = ROOT.parent / "presentations"
 OUT = OUT_DIR / "presentation-titres-tresor.pptx"
+OUT_ALT = OUT_DIR / "presentation-titres-tresor-v2.pptx"
 LOGO = ROOT / "public" / "logo.webp"
 
 # Charte Gouvernement RDC
@@ -207,7 +208,7 @@ def build():
     title(s, "Au programme")
     items = [
         "01  Théorie : titres, BT, OT",
-        "02  Acheteurs actuels & profils cibles",
+        "02  Acheteurs, liquidité bancaire & profils cibles",
         "03  Processus actuel d’achat (BT & OT)",
         "04  Limites, digitalisation ekonzo",
         "05  Contraintes qui demeurent",
@@ -428,6 +429,68 @@ def build():
         color=BLEU_FONCE,
     )
     stripe_footer(s, "Profils qui achètent aujourd’hui auprès du Trésor")
+
+    # 8bis Liquidité & inclusion
+    s = blank(prs)
+    brand_bar(s, "Partie 1 · Enjeu liquidité")
+    eyebrow(s, "Pourquoi ouvrir aux particuliers")
+    title(s, "Liquidité bancaire & inclusion financière")
+    lead(
+        s,
+        "Les banques placent déjà l’épargne et les dépôts sur les titres du Trésor — et pourtant elles manquent souvent encore de liquidité pour répondre à tous les besoins.",
+        y=Inches(2.3),
+    )
+    card(
+        s,
+        Inches(0.4),
+        Inches(3.15),
+        Inches(4.0),
+        Inches(2.9),
+        "Aujourd’hui",
+        [
+            "Les banques utilisent épargne / dépôts pour soumissionner aux BT et OT.",
+            "Limite : la liquidité reste souvent insuffisante face à la demande et aux autres emplois (crédits, réserves…).",
+        ],
+        "r",
+    )
+    card(
+        s,
+        Inches(4.6),
+        Inches(3.15),
+        Inches(4.0),
+        Inches(2.9),
+        "Avec les particuliers (ekonzo)",
+        [
+            "Le citoyen achète avec son argent (MoMo, virement…).",
+            "Effet banque : flux dédiés aux BT/OT en plus de ce qu’elle place déjà — liquidité additionnelle.",
+        ],
+        "y",
+    )
+    card(
+        s,
+        Inches(8.8),
+        Inches(3.15),
+        Inches(4.0),
+        Inches(2.9),
+        "Pour le Gouvernement",
+        [
+            "Élargir l’accès aux titres d’État = levier d’inclusion bancaire / financière.",
+            "Compte-titres, KYC, parcours digital : plus de citoyens dans le circuit formel.",
+        ],
+        "n",
+    )
+    add_textbox(
+        s,
+        Inches(0.55),
+        Inches(6.2),
+        Inches(12),
+        Inches(0.5),
+        "En résumé : ouvrir l’achat aux particuliers n’enlève pas de liquidité aux banques — cela leur apporte des flux dédiés aux titres du Trésor, et aide l’État à démocratiser l’épargne souveraine.",
+        size=12,
+        bold=True,
+        color=BLEU_FONCE,
+    )
+    stripe_footer(s, "Liquidité additionnelle · Inclusion bancaire")
 
     # 9 Profils BT
     s = blank(prs)
@@ -736,8 +799,12 @@ def build():
     stripe_footer(s, "ekonzo · Ministère des Finances · Kinshasa, RDC", cover=True)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    prs.save(OUT)
-    print(f"Saved {OUT} ({len(prs.slides)} slides)")
+    try:
+        prs.save(OUT)
+        print(f"Saved {OUT} ({len(prs.slides)} slides)")
+    except PermissionError:
+        prs.save(OUT_ALT)
+        print(f"Saved {OUT_ALT} ({len(prs.slides)} slides) — fermez le PPTX ouvert pour écraser l’original")
 
 
 if __name__ == "__main__":
