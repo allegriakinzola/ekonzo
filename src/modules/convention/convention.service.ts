@@ -127,6 +127,87 @@ export async function readAgreementPdfBuffer(agreement: {
   return readFile(absolute);
 }
 
+/**
+ * Régénère le PDF avec le modèle actuel (mise en page + texte condensé + logo banque)
+ * et met à jour le stockage. Permet aux conventions déjà signées d'obtenir le nouveau format.
+ */
+export async function regenerateAgreementPdf(agreement: {
+  id: string;
+  userId: string;
+  partnerBankCode: string;
+  partnerBankName: string;
+  signedName: string;
+  signatureMethod: string;
+  signatureHash: string;
+  signedAt: Date;
+  ipAddress?: string | null;
+  pdfPath: string;
+  signatureImagePath?: string | null;
+  signatureImageBase64?: string | null;
+  pdfBase64?: string | null;
+}): Promise<Buffer> {
+  const bank =
+    getPartnerBankByCode(agreement.partnerBankCode) ??
+    ({
+      code: agreement.partnerBankCode,
+      name: agreement.partnerBankName,
+      shortName: agreement.partnerBankName,
+      logoSrc: "/logoequity.png",
+      available: true,
+    } as const);
+
+  const user = await prisma.user.findUnique({
+    where: { id: agreement.userId },
+    select: { phoneNumber: true },
+  });
+
+  const convention = await prisma.securitiesAccountConvention.findFirst({
+    where: { agreements: { some: { id: agreement.id } } },
+    select: { title: true, version: true },
+  });
+
+  const bodyMarkdown = buildConventionBody(bank.name);
+  const signatureImage = await readAgreementSignatureBuffer(agreement);
+  const method =
+    agreement.signatureMethod === "DRAWN" ? "DRAWN" : "TYPED";
+
+  const { buffer, sha256 } = await generateConventionPdf({
+    title: convention?.title ?? CONVENTION_TITLE,
+    version: convention?.version ?? CONVENTION_VERSION,
+    partnerBankName: bank.name,
+    partnerBankShortName: "shortName" in bank ? bank.shortName : bank.name,
+    partnerBankLogoSrc: "logoSrc" in bank ? bank.logoSrc : "/logoequity.png",
+    bodyMarkdown,
+    signedName: agreement.signedName,
+    userId: agreement.userId,
+    userPhone: user?.phoneNumber,
+    signedAt: agreement.signedAt,
+    signatureHash: agreement.signatureHash,
+    ipAddress: agreement.ipAddress,
+    signatureImage,
+    signatureMethod: method,
+  });
+
+  const pdfBase64 = buffer.toString("base64");
+  try {
+    const uploadDir = getConventionUploadDir();
+    const absolute = path.join(uploadDir, agreement.pdfPath);
+    if (absolute.startsWith(uploadDir)) {
+      await mkdir(path.dirname(absolute), { recursive: true });
+      await writeFile(absolute, buffer);
+    }
+  } catch {
+    // FS optionnel (Vercel) — la DB suffit
+  }
+
+  await prisma.securitiesAccountAgreement.update({
+    where: { id: agreement.id },
+    data: { pdfBase64, pdfSha256: sha256 },
+  });
+
+  return buffer;
+}
+
 /** Lit l'image de signature : base64 DB ou disque. */
 export async function readAgreementSignatureBuffer(agreement: {
   signatureImagePath?: string | null;
@@ -209,6 +290,8 @@ export async function signActiveConvention(opts: {
     title: convention.title,
     version: convention.version,
     partnerBankName: bank.name,
+    partnerBankShortName: bank.shortName,
+    partnerBankLogoSrc: bank.logoSrc,
     bodyMarkdown,
     signedName,
     userId: opts.userId,

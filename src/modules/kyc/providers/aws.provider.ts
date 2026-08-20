@@ -38,9 +38,16 @@ function matchLabel(line: string, labels: string[]): { label: string } | null {
     if (n === l) return { label: l };
     if (n.startsWith(l + ":") || n.startsWith(l + " :")) return { label: l };
 
-    // "Nom KINZOLA" sans deux-points — mais pas "Nom du père" / "Nom de la mère"
+    // "Nom KINZOLA" sans deux-points — mais pas "Nom du père" / "Nom de la mère" / "NOM CI"
     if (n.startsWith(l + " ") && n.length > l.length + 1) {
-      if (l === "nom" && (n.startsWith("nom du ") || n.startsWith("nom de "))) {
+      if (
+        l === "nom" &&
+        (n.startsWith("nom du ") ||
+          n.startsWith("nom de ") ||
+          n.startsWith("nom ci") ||
+          n.startsWith("nom c.i") ||
+          n.startsWith("nom c i"))
+      ) {
         continue;
       }
       return { label: l };
@@ -76,7 +83,13 @@ const KNOWN_LABELS = [
   "nom de la mere",
   "lieu et date de delivrance",
   "code ci",
+  "code c.i",
+  "nom ci",
+  "nom c.i",
   "nn",
+  "nn.s",
+  "nn.s.",
+  "nns",
 ];
 
 function looksLikeLabel(line: string): boolean {
@@ -84,7 +97,38 @@ function looksLikeLabel(line: string): boolean {
   if (KNOWN_LABELS.includes(n)) return true;
   if (n.startsWith("postnom")) return true;
   if (n.startsWith("date /") || n.startsWith("date/")) return true;
+  if (n.startsWith("code ci") || n.startsWith("nom ci")) return true;
+  if (n.startsWith("nn.s") || n.startsWith("nn ")) return true;
   return false;
+}
+
+/** CODE CI = numéro réel de la carte d'électeur (ex. 1004111). */
+function extractCodeCi(lines: string[]): string | undefined {
+  const fromLabel = valueAfterLabel(lines, ["code ci", "code c.i", "code c i"], {
+    maxLines: 1,
+  });
+  if (fromLabel) {
+    const digits = fromLabel.replace(/\D/g, "");
+    // CODE CI typique : 6–10 chiffres (souvent 7). Exclure le NN.S. (10–13 chiffres).
+    if (/^\d{6,9}$/.test(digits)) return digits;
+  }
+
+  // Fallback : ligne seule du type 1004111 près d'un libellé CODE CI
+  const codeIdx = lines.findIndex((l) => /code\s*c\.?\s*i/i.test(norm(l)));
+  if (codeIdx >= 0) {
+    for (let i = 0; i <= 2; i++) {
+      const candidate = (lines[codeIdx + i] ?? "").replace(/\s/g, "");
+      const m = candidate.match(/(\d{6,9})/);
+      if (m && !/^\d{10,}$/.test(m[1])) return m[1];
+    }
+  }
+
+  // Dernier recours : nombre 6–9 chiffres commençant souvent par 1 (ex. 1004…)
+  const standalone = lines
+    .map((l) => l.replace(/\s/g, ""))
+    .map((l) => l.match(/^(\d{6,9})$/)?.[1])
+    .find((d) => d && !/^\d{10,}$/.test(d));
+  return standalone;
 }
 
 /** Valeur sur la même ligne après le libellé, ou sur la/les lignes suivantes. */
@@ -144,15 +188,16 @@ function extractDate(text: string | undefined): string | undefined {
  *   Postnom/Prenom → NKUNDIDI/ALEGRIA
  *   Date / Lieu de naissance → 09/11/2001 KINSHASA
  *   Adresse → NGEBA N°15 + ligne suivante (commune/ville)
- *   N° national (rouge) → 30186733319
- *   CODE CI → 1004111 (ce n'est PAS le n° de document principal)
+ *   CODE CI → 1004111  ← numéro réel de la carte
+ *   NN.S. → 30186733319 ← n° national (ne pas utiliser comme n° de carte)
+ *   NOM CI → libellé distinct (ne pas confondre avec Nom)
  */
 function parseCarteElecteur(lines: string[]): KycExtractedData | null {
   const joined = norm(lines.join(" "));
   const isVoterCard =
     joined.includes("electeur") ||
     joined.includes("carte d'electeur") ||
-    lines.some((l) => isLabelLine(l, ["code ci", "code c.i"]));
+    lines.some((l) => /code\s*c\.?\s*i/i.test(norm(l)));
 
   if (!isVoterCard) return null;
 
@@ -169,12 +214,53 @@ function parseCarteElecteur(lines: string[]): KycExtractedData | null {
     "nom de la mere",
     "lieu et date de delivrance",
     "code ci",
+    "nom ci",
+    "nn.s",
+    "nn.s.",
   ];
 
-  const lastName = valueAfterLabel(lines, ["nom"], {
+  // Chercher le vrai champ « Nom » (pas « NOM CI » / « Nom du père »)
+  let lastName = valueAfterLabel(lines, ["nom"], {
     maxLines: 1,
     stopLabels: stop.filter((s) => s !== "nom"),
   });
+
+  // Si OCR a collé « Nom KINZOLA » sur une ligne isolée après filtrage NOM CI
+  if (!lastName || /^(ci|nn|m|f|danel)$/i.test(lastName)) {
+    const nomIdx = lines.findIndex((line) => {
+      const n = norm(line);
+      return (
+        n === "nom" ||
+        n === "nom:" ||
+        /^nom\s*:/i.test(n) ||
+        (/^nom\s+[a-z]/i.test(n) &&
+          !n.startsWith("nom du ") &&
+          !n.startsWith("nom de ") &&
+          !n.startsWith("nom ci"))
+      );
+    });
+    if (nomIdx >= 0) {
+      const line = lines[nomIdx];
+      const n = norm(line);
+      let candidate = "";
+      if (n.includes(":")) {
+        candidate = line.split(/:\s*/).slice(1).join(":").trim();
+      } else if (/^nom\s+/i.test(line)) {
+        candidate = line.replace(/^nom\s*:?\s*/i, "").trim();
+      }
+      if (!candidate || looksLikeLabel(candidate)) {
+        candidate = (lines[nomIdx + 1] ?? "").trim();
+      }
+      if (
+        candidate &&
+        !looksLikeLabel(candidate) &&
+        /^[A-Za-zÀ-ÿ' -]{2,}$/.test(candidate) &&
+        !/^(ci|nn|m|f)$/i.test(candidate)
+      ) {
+        lastName = candidate;
+      }
+    }
+  }
 
   // "Postnom/Prenom" → NKUNDIDI/ALEGRIA
   const postPrenom = valueAfterLabel(
@@ -202,36 +288,35 @@ function parseCarteElecteur(lines: string[]): KycExtractedData | null {
     maxLines: 2,
     stopLabels: ["origine", "nom du pere", "nom de la mere", "lieu et date de delivrance"],
   });
-  // Filigrane "CENI" souvent collé au milieu de l'adresse par l'OCR
   const address = rawAddress
     ?.replace(/\bCENI\b/gi, " ")
     .replace(/\s+/g, " ")
     .replace(/\s+\/\s*/g, "/")
+    .replace(/\bVilled\b/gi, "Ville")
     .trim();
 
-  // N° national long (ex. 30186733319) — prioritaire sur CODE CI (court, 7 chiffres)
+  // Numéro de carte = CODE CI (ex. 1004111), pas le NN.S. (ex. 30186733319)
+  const codeCi = extractCodeCi(lines);
   const nationalId = lines
     .map((l) => l.replace(/\s/g, ""))
     .find((l) => /^\d{10,13}$/.test(l));
-
-  // N° de série type "A3 157.112041749"
   const serial = lines.find((l) => /^[A-Z]\d\s*\d{2,3}\.\d{6,}$/i.test(l.trim()));
 
-  const docNumber = nationalId ?? serial?.replace(/\s+/g, " ").trim();
+  const docNumber =
+    codeCi ?? serial?.replace(/\s+/g, " ").trim() ?? nationalId;
 
-  // Évite "CI" (issu de CODE CI) ou valeurs trop courtes / libellés
   const cleanLast =
     lastName &&
     lastName.length >= 2 &&
     !/^(ci|nn|m|f)$/i.test(lastName) &&
     !/postnom|pere|mere|sexe|code/i.test(lastName)
-      ? lastName
+      ? lastName.toUpperCase()
       : undefined;
 
   return {
     lastName: cleanLast,
-    postName,
-    firstName,
+    postName: postName?.toUpperCase(),
+    firstName: firstName?.toUpperCase(),
     dateOfBirth,
     address,
     docNumber,

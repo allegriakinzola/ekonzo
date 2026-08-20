@@ -3,12 +3,12 @@ import {
   BriefcaseIcon,
   CalendarBlankIcon,
   ChartLineUpIcon,
-  CreditCardIcon,
   HouseIcon,
   IdentificationCardIcon,
   PlusIcon,
   WarningCircleIcon,
   ClockIcon,
+  StackIcon,
 } from "@phosphor-icons/react/dist/ssr";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -63,13 +63,12 @@ export default async function DashboardPage() {
   const conventionSigned = await hasSignedConvention(session.user.id);
   const settlement = await getSettlementProfile(session.user.id);
 
-  const [subscriptions, wallets, openProducts] = await Promise.all([
+  const [subscriptions, openProducts, openCount] = await Promise.all([
     prisma.subscription.findMany({
       where: { userId: session.user.id },
       include: { product: { select: { maturityDate: true, currency: true } } },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.wallet.findMany({ where: { userId: session.user.id } }),
     prisma.product.findMany({
       where: { status: "OPEN" },
       orderBy: { subscriptionDeadline: "asc" },
@@ -85,6 +84,7 @@ export default async function DashboardPage() {
         totalVolume: true,
       },
     }),
+    prisma.product.count({ where: { status: "OPEN" } }),
   ]);
 
   const committedMap = await getCommittedVolumes(openProducts.map((p) => p.id));
@@ -92,21 +92,29 @@ export default async function DashboardPage() {
   const activeOrAdjudicated = subscriptions.filter((s) =>
     ["ADJUDICATED", "ACTIVE", "PAYMENT_CONFIRMED", "SUBMITTED"].includes(s.status)
   );
-  const totalInvested = activeOrAdjudicated.reduce((sum, s) => sum + Number(s.adjudicatedAmount ?? s.amount), 0);
-  const activeCurrency = activeOrAdjudicated[0]?.currency ?? "USD";
+  const investedUsd = activeOrAdjudicated
+    .filter((s) => s.currency === "USD")
+    .reduce((sum, s) => sum + Number(s.adjudicatedAmount ?? s.amount), 0);
+  const investedCdf = activeOrAdjudicated
+    .filter((s) => s.currency === "CDF")
+    .reduce((sum, s) => sum + Number(s.adjudicatedAmount ?? s.amount), 0);
+
+  const capitalValue =
+    investedUsd > 0 && investedCdf > 0
+      ? `${formatAmount(investedUsd.toString(), "USD")} · ${formatAmount(investedCdf.toString(), "CDF")}`
+      : investedCdf > 0
+        ? formatAmount(investedCdf.toString(), "CDF")
+        : formatAmount(investedUsd.toString(), "USD");
 
   const nextMaturity = activeOrAdjudicated
     .map((s) => s.product.maturityDate)
     .filter(Boolean)
     .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0];
 
-  const walletCdf = wallets.find((w) => w.currency === "CDF");
-  const walletUsd = wallets.find((w) => w.currency === "USD");
-
   const STAT_CARDS = [
     {
       label: "Capital investi",
-      value: totalInvested > 0 ? formatAmount(totalInvested.toString(), activeCurrency) : "0,00 " + activeCurrency,
+      value: capitalValue,
       sub: activeOrAdjudicated.length > 0 ? `${activeOrAdjudicated.length} placement${activeOrAdjudicated.length > 1 ? "s" : ""} actif${activeOrAdjudicated.length > 1 ? "s" : ""}` : "Aucun placement actif",
       icon: BriefcaseIcon,
       accent: "text-primary bg-primary/10 ring-primary/15",
@@ -126,10 +134,10 @@ export default async function DashboardPage() {
       accent: "text-rdc-navy bg-rdc-navy/10 ring-rdc-navy/15",
     },
     {
-      label: "Wallet CDF",
-      value: walletCdf ? formatAmount(walletCdf.balance.toString(), "CDF") : "0,00 CDF",
-      sub: walletUsd ? `USD : ${formatAmount(walletUsd.balance.toString(), "USD")}` : "Wallet USD vide",
-      icon: CreditCardIcon,
+      label: "Émissions ouvertes",
+      value: openCount.toString(),
+      sub: openCount > 0 ? "Bons du Trésor disponibles" : "Aucune émission ouverte",
+      icon: StackIcon,
       accent: "text-amber-700 bg-amber-50 ring-amber-100",
     },
   ];

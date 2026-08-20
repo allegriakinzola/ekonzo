@@ -1,7 +1,6 @@
 /**
- * Texte type de la convention de compte-titres.
- * Tenue au nom de la banque partenaire (teneur de comptes).
- * Réf. : art. 66 loi n°22/069 ; décret n°18/025 art. 5 et 9 ; OL n°23/010 (écrit / signature électronique).
+ * Texte type de la convention de compte-titres (version condensée).
+ * Réf. : art. 66 loi n°22/069 ; décret n°18/025 ; OL n°23/010.
  */
 
 export const CONVENTION_VERSION = "2026.1";
@@ -11,72 +10,34 @@ export const CONVENTION_TITLE =
 
 export function buildConventionBody(partnerBankName: string): string {
   return `
-## 1. Objet
+## Article 1 — Objet
 
-La présente convention a pour objet l'ouverture et la tenue d'un compte-titres destiné à l'inscription, à la garde et à l'administration des bons du Trésor et obligations du Trésor souscrits par le Titulaire via la plateforme ekonzo.
+La présente convention a pour objet l'ouverture et la tenue d'un compte-titres pour l'inscription et la garde des bons et obligations du Trésor souscrits via ekonzo, conformément à l'article 66 de la loi n°22/069 du 27 décembre 2022.
 
-Conformément à l'article 66 de la loi n°22/069 du 27 décembre 2022, toute ouverture d'un compte-titres fait l'objet d'une convention écrite entre le client et son établissement de crédit.
+## Article 2 — Parties
 
-## 2. Parties
+**La Banque (Teneur de comptes)** : ${partnerBankName}, établissement de crédit agréé par la Banque centrale du Congo.
 
-**Le Teneur de comptes** : ${partnerBankName}, établissement de crédit agréé par la Banque centrale du Congo, ci-après « la Banque ».
+**Le Titulaire** : la personne dont l'identité a été vérifiée (KYC) sur ekonzo.
 
-**Le Titulaire** : la personne physique ou morale dont l'identité a été vérifiée (KYC) sur la plateforme ekonzo, ci-après « le Titulaire ».
+**ekonzo** : canal numérique technique agissant pour le compte de la Banque. ekonzo n'est pas teneur de comptes-titres.
 
-**ekonzo** : plateforme numérique de distribution opérant comme canal technique pour le compte de la Banque. ekonzo n'est pas teneur de comptes-titres et ne reçoit pas de fonds remboursables du public en son nom propre.
+## Article 3 — Compte-titres et fonctionnement
 
-## 3. Nature des titres
+Les titres du Trésor sont dématérialisés et inscrits exclusivement en compte-titres (décret n°18/025). La Banque tient le compte individuel du Titulaire ; le registre central est tenu par la Banque centrale du Congo.
 
-Les bons et obligations du Trésor sont des titres dématérialisés exclusivement inscrits en comptes-titres, négociables et assimilables (décret n°18/025 du 11 juin 2018, article 5).
+Sur instructions du Titulaire transmises via ekonzo, la Banque enregistre les souscriptions, inscrit les titres, encaisse les intérêts et rembourse le principal à échéance. Les paiements s'effectuent par Mobile Money, virement ou tout autre canal indiqué sur ekonzo.
 
-Le registre central des titres est tenu dans les livres de la Banque centrale du Congo. La Banque assure la tenue du compte-titres individuel du Titulaire. ekonzo tient un registre miroir à des fins d'information et de suivi, sans valeur de conservation juridique.
+## Article 4 — Obligations du Titulaire
 
-## 4. Ouverture du compte
+Le Titulaire s'engage à fournir des informations exactes, à ne pas céder l'usage de son compte ekonzo, à signaler toute opération non autorisée et à respecter les règles LBC/FT et plafonds de souscription.
 
-L'ouverture du compte-titres est subordonnée :
+## Article 5 — Signature électronique
 
-1. à la vérification d'identité (KYC) du Titulaire ;
-2. à l'acceptation et à la signature électronique de la présente convention ;
-3. au respect des règles LBC/FT applicables.
+Conformément à l'ordonnance-loi n°23/010 portant Code du numérique, le Titulaire reconnaît à l'écrit et à la signature électroniques la même force probante qu'un écrit papier. Une copie PDF signée lui est accessible depuis ekonzo.
 
-Une copie de la présente convention est remise au Titulaire (téléchargement PDF depuis son espace ekonzo).
+## Article 6 — Durée et droit applicable
 
-## 5. Fonctionnement
-
-Sur instructions du Titulaire transmises via ekonzo, la Banque :
-
-- enregistre les souscriptions retenues aux adjudications ;
-- inscrit les titres sur le compte-titres du Titulaire ;
-- encaisse les intérêts (coupons) et le remboursement du principal à échéance ;
-- informe le Titulaire des mouvements affectant son compte (via ekonzo et/ou ses propres canaux).
-
-## 6. Paiements
-
-Les souscriptions sont réglées par Mobile Money, virement bancaire ou tout autre canal mis à disposition, selon les modalités communiquées sur ekonzo. Les fonds transitent vers les comptes de la Banque puis, le cas échéant, vers le compte général du Trésor ouvert à la Banque centrale du Congo.
-
-## 7. Signature électronique
-
-En application de l'ordonnance-loi n°23/010 du 13 mars 2023 portant Code du numérique, le Titulaire reconnaît que :
-
-- l'écrit électronique horodaté et signé a la même force probante qu'un écrit sur papier ;
-- sa signature électronique (nom saisi + horodatage + empreinte cryptographique du document) manifeste son consentement aux obligations de la présente convention ;
-- une copie PDF signée est archivée et lui est accessible.
-
-## 8. Obligations du Titulaire
-
-Le Titulaire s'engage à :
-
-- fournir des informations exactes et à jour ;
-- ne pas céder l'usage de son compte ekonzo à un tiers ;
-- signaler sans délai toute opération non autorisée ;
-- respecter les plafonds et règles de souscription communiqués.
-
-## 9. Durée et résiliation
-
-La convention est conclue pour une durée indéterminée. Elle peut être résiliée par le Titulaire sous réserve de l'absence de titres en compte, ou clôturée par la Banque dans les cas prévus par la réglementation (notamment comptes inactifs — art. 67 de la loi n°22/069).
-
-## 10. Droit applicable
-
-La présente convention est régie par le droit de la République Démocratique du Congo. Tout litige relève des juridictions compétentes de Kinshasa/Gombe, sauf disposition contraire d'ordre public.
+La convention est à durée indéterminée. Elle peut être résiliée par le Titulaire (compte sans titres) ou clôturée par la Banque selon la réglementation. Elle est régie par le droit de la RDC ; litiges : juridictions de Kinshasa/Gombe.
 `.trim();
 }

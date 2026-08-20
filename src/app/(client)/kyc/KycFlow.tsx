@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PhotoPicker } from "@/components/PhotoPicker";
+import { formatDateOfBirthDisplay } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const DOC_TYPES = [
@@ -316,23 +318,15 @@ export function KycFlow() {
               })}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="docFile">Photo du document (recto)</Label>
-              <Input
-                id="docFile"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="h-11 pt-2"
-                onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null;
-                  docFileRef.current = f;
-                  setDocFile(f);
-                }}
-              />
-              <p className="text-xs text-muted-foreground">
-                Photo nette, bien éclairée, texte lisible. Max 5 Mo.
-              </p>
-            </div>
+            <PhotoPicker
+              facingMode="environment"
+              label="Photo du document (recto)"
+              hint="Prenez une photo avec l'appareil photo, ou importez une image nette du recto."
+              onCapture={(f) => {
+                docFileRef.current = f;
+                setDocFile(f);
+              }}
+            />
 
             <Button
               onClick={onExtractDocument}
@@ -400,12 +394,11 @@ export function KycFlow() {
               <div className="space-y-1.5">
                 <Label>Date de naissance</Label>
                 <Input
-                  className="h-10"
-                  placeholder="jj/mm/aaaa"
-                  value={fields.dateOfBirth}
-                  onChange={(e) =>
-                    setFields((f) => ({ ...f, dateOfBirth: e.target.value }))
-                  }
+                  className="h-10 bg-muted/50"
+                  value={formatDateOfBirthDisplay(fields.dateOfBirth)}
+                  readOnly
+                  disabled
+                  title="L'année est masquée pour confidentialité"
                 />
               </div>
               <div className="space-y-1.5">
@@ -458,20 +451,12 @@ export function KycFlow() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="selfieFile">Votre photo selfie</Label>
-              <Input
-                id="selfieFile"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                capture="user"
-                className="h-11 pt-2"
-                onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Visage bien visible, sans lunettes de soleil ni masque.
-              </p>
-            </div>
+            <PhotoPicker
+              facingMode="user"
+              label="Votre photo selfie"
+              hint="Prenez un selfie avec l'appareil photo, ou importez une photo de visage claire."
+              onCapture={setSelfieFile}
+            />
 
             <Button
               onClick={onVerifySelfie}

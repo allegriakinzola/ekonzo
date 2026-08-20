@@ -15,9 +15,8 @@ export default function ConventionPage() {
           Convention de compte-titres
         </h1>
         <p className="text-sm text-muted-foreground">
-          Choisissez votre banque partenaire, lisez la convention, puis signez
-          électroniquement. Sans cette étape, l&apos;accès à l&apos;application
-          reste bloqué.
+          Parcours en 3 étapes : banque partenaire, lecture de la convention,
+          puis signature électronique.
         </p>
       </div>
       <ConventionSignForm />

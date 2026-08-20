@@ -61,7 +61,6 @@ export default async function ProfilePage() {
         id: true,
         name: true,
         phoneNumber: true,
-        email: true,
         kycStatus: true,
         createdAt: true,
         kyc: {
@@ -75,7 +74,6 @@ export default async function ProfilePage() {
             verifiedAt: true,
           },
         },
-        wallets: { select: { currency: true, balance: true } },
         _count: { select: { subscriptions: true } },
       },
     }),
@@ -125,7 +123,6 @@ export default async function ProfilePage() {
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-3 pt-4 sm:grid-cols-2">
           <Field label="Numéro de téléphone" value={user.phoneNumber ?? "—"} />
-          <Field label="Email" value={user.email ?? "—"} />
           <Field label="Membre depuis" value={formatDate(user.createdAt)} />
           <Field
             label="Souscriptions"

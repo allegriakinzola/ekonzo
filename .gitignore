@@ -42,3 +42,7 @@ next-env.d.ts
 
 # uploads locaux (KYC, conventions PDF)
 /uploads
+
+# présentations (hors dépôt — fichier généré dans ../presentations/)
+/public/presentation-titres-tresor.*
+*.pptx

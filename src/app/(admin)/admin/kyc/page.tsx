@@ -38,6 +38,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatDateOfBirthDisplay } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface KycRecord {
@@ -335,7 +336,7 @@ export default function AdminKycPage() {
                       ["Prénom", selectedKyc.firstName || "—"],
                       ["Nom", selectedKyc.lastName || "—"],
                       ["Post-nom", selectedKyc.postName ?? "—"],
-                      ["Date de naissance", selectedKyc.dateOfBirth ?? "—"],
+                      ["Date de naissance", formatDateOfBirthDisplay(selectedKyc.dateOfBirth)],
                       ["Adresse", selectedKyc.address ?? "—"],
                       ["Téléphone", selectedKyc.user.phoneNumber || "—"],
                       [

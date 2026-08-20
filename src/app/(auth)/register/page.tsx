@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
+import { PhotoPicker } from "@/components/PhotoPicker";
+import { formatDateOfBirthDisplay } from "@/lib/format";
 import {
   isValidMomoPhone,
   MOMO_PHONE_ERROR,
@@ -428,23 +430,15 @@ export default function RegisterPage() {
                 ))}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="docFile">Photo du document (recto)</Label>
-                <Input
-                  id="docFile"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="h-11 pt-2"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    docFileRef.current = f;
-                    setDocFile(f);
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Photo nette, bien éclairée, texte lisible. Max 5 Mo.
-                </p>
-              </div>
+              <PhotoPicker
+                facingMode="environment"
+                label="Photo du document (recto)"
+                hint="Prenez une photo avec l'appareil photo, ou importez une image nette du recto."
+                onCapture={(f) => {
+                  docFileRef.current = f;
+                  setDocFile(f);
+                }}
+              />
 
               <Button onClick={onExtractDocument} className="w-full h-11" disabled={loading || !docFile}>
                 {loading ? "Lecture du document…" : "Analyser mon document"}
@@ -478,8 +472,13 @@ export default function RegisterPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Date de naissance</Label>
-                  <Input className="h-10" placeholder="jj/mm/aaaa" value={fields.dateOfBirth}
-                    onChange={(e) => setFields((f) => ({ ...f, dateOfBirth: e.target.value }))} />
+                  <Input
+                    className="h-10 bg-muted/50"
+                    value={formatDateOfBirthDisplay(fields.dateOfBirth)}
+                    readOnly
+                    disabled
+                    title="L'année est masquée pour confidentialité"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>N° du document</Label>
@@ -508,21 +507,12 @@ export default function RegisterPage() {
 
           {step === "selfie" && (
             <div className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="selfieFile">Votre photo selfie</Label>
-                <Input
-                  id="selfieFile"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  capture="user"
-                  className="h-11 pt-2"
-                  onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Visage bien visible, sans lunettes de soleil ni masque. Nous comparons
-                  cette photo avec celle de votre document.
-                </p>
-              </div>
+              <PhotoPicker
+                facingMode="user"
+                label="Votre photo selfie"
+                hint="Prenez un selfie avec l'appareil photo, ou importez une photo de visage claire."
+                onCapture={setSelfieFile}
+              />
 
               <Button onClick={onVerifySelfie} className="w-full h-11" disabled={loading || !selfieFile}>
                 {loading ? "Vérification du visage…" : "Vérifier mon identité"}

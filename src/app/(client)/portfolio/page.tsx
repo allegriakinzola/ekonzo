@@ -62,27 +62,22 @@ function statusBadgeClass(status: string) {
 export default async function PortfolioPage() {
   const session = await requireRole("CLIENT");
 
-  const [subscriptions, wallets] = await Promise.all([
-    prisma.subscription.findMany({
-      where: { userId: session.user.id },
-      include: {
-        product: {
-          select: {
-            code: true,
-            type: true,
-            currency: true,
-            maturityDate: true,
-            discountRate: true,
-            couponRate: true,
-          },
+  const subscriptions = await prisma.subscription.findMany({
+    where: { userId: session.user.id },
+    include: {
+      product: {
+        select: {
+          code: true,
+          type: true,
+          currency: true,
+          maturityDate: true,
+          discountRate: true,
+          couponRate: true,
         },
       },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.wallet.findMany({
-      where: { userId: session.user.id },
-    }),
-  ]);
+    },
+    orderBy: { createdAt: "desc" },
+  });
 
   const activeSubscriptions = subscriptions.filter((s) =>
     [
@@ -114,7 +109,7 @@ export default async function PortfolioPage() {
             Mon portefeuille
           </h1>
           <p className="text-sm text-muted-foreground">
-            Suivi de vos placements et de votre solde
+            Suivi de vos souscriptions aux Bons du Trésor
           </p>
         </div>
         <Button render={<Link href="/products" />} size="lg">
@@ -160,37 +155,22 @@ export default async function PortfolioPage() {
             </p>
           </CardContent>
         </Card>
-        {wallets.length > 0 ? (
-          wallets.map((w) => (
-            <Card key={w.id} className="ring-1 ring-rdc-navy/5">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-[11px] font-medium uppercase tracking-wide">
-                  Solde wallet ({w.currency})
-                </CardDescription>
-                <CardTitle className="text-2xl font-bold tracking-tight">
-                  {formatAmount(w.balance.toString(), w.currency)}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">Disponible</p>
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <Card className="ring-1 ring-rdc-navy/5">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-[11px] font-medium uppercase tracking-wide">
-                Solde wallet
-              </CardDescription>
-              <CardTitle className="text-2xl font-bold tracking-tight">
-                —
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">Aucun wallet créé</p>
-            </CardContent>
-          </Card>
-        )}
+        <Card className="ring-1 ring-rdc-navy/5">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-[11px] font-medium uppercase tracking-wide">
+              Souscriptions
+            </CardDescription>
+            <CardTitle className="text-2xl font-bold tracking-tight">
+              {subscriptions.length}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              {activeSubscriptions.length} active
+              {activeSubscriptions.length > 1 ? "s" : ""}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="border-border/80 bg-card shadow-sm ring-1 ring-rdc-navy/5">
