@@ -1,4 +1,9 @@
-import { UsersThreeIcon } from "@phosphor-icons/react/dist/ssr";
+import {
+  BankIcon,
+  LinkBreakIcon,
+  ShieldCheckIcon,
+  UsersThreeIcon,
+} from "@phosphor-icons/react/dist/ssr";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,44 +21,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader } from "@/components/page-header";
+import { Avatar, BankLogo, EmptyState, StatCard } from "@/components/data-display";
+import {
+  DISCARDED_STATUSES,
+  ROLE_LABELS,
+  roleClass,
+} from "@/components/status-badges";
 import { formatDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
-const KYC_LABELS: Record<string, string> = {
-  PENDING: "Non soumis",
-  SUBMITTED: "En attente",
-  UNDER_REVIEW: "En révision",
-  VERIFIED: "Vérifié",
-  APPROVED: "Approuvé",
-  REJECTED: "Rejeté",
-};
-
-function kycBadgeClass(status: string) {
-  switch (status) {
-    case "VERIFIED":
-    case "APPROVED":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "REJECTED":
-      return "border-destructive/20 bg-destructive/10 text-destructive";
-    case "SUBMITTED":
-    case "UNDER_REVIEW":
-      return "border-amber-200 bg-amber-50 text-amber-800";
-    default:
-      return "border-border bg-muted text-muted-foreground";
-  }
-}
-
-function roleBadgeClass(role: string) {
-  switch (role) {
-    case "SUPER_ADMIN":
-      return "border-primary/20 bg-primary/10 text-primary";
-    case "ADMIN":
-      return "border-rdc-navy/20 bg-rdc-navy/10 text-rdc-navy";
-    default:
-      return "border-border bg-muted text-muted-foreground";
-  }
+function maskAccount(acc: string) {
+  return acc.length > 4 ? `•••• ${acc.slice(-4)}` : acc;
 }
 
 export default async function AdminUsersPage() {
@@ -64,62 +45,93 @@ export default async function AdminUsersPage() {
     select: {
       id: true,
       name: true,
+      email: true,
       phoneNumber: true,
       role: true,
-      kycStatus: true,
       banned: true,
       createdAt: true,
-      _count: { select: { subscriptions: true } },
+      _count: {
+        select: {
+          subscriptions: {
+            where: { status: { notIn: DISCARDED_STATUSES } },
+          },
+        },
+      },
+      bankLink: {
+        select: {
+          accountNumber: true,
+          currency: true,
+          linkedAt: true,
+          partnerBank: {
+            select: { shortName: true, name: true, logoUrl: true },
+          },
+        },
+      },
     },
   });
 
-  const kycVerified = users.filter((u) => u.kycStatus === "VERIFIED").length;
-  const kycPending = users.filter((u) => u.kycStatus === "SUBMITTED").length;
+  const clients = users.filter((u) => u.role === "CLIENT");
+  const linked = clients.filter((u) => u.bankLink).length;
+  const staff = users.length - clients.length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-primary">
-            <UsersThreeIcon className="size-5" weight="duotone" />
-            <span className="text-xs font-medium uppercase tracking-wide">
-              Comptes
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-rdc-navy">
-            Utilisateurs
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {users.length} compte{users.length > 1 ? "s" : ""} · {kycVerified}{" "}
-            vérifiés · {kycPending} en attente KYC
-          </p>
-        </div>
-        <Badge variant="outline" className="h-7 px-3 text-xs">
-          {users.length} utilisateur{users.length > 1 ? "s" : ""}
-        </Badge>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Comptes"
+        icon={<UsersThreeIcon className="size-4" weight="duotone" />}
+        title="Utilisateurs"
+        description="Investisseurs inscrits sur ekonzo, banque partenaire à laquelle chacun est lié, et comptes du Ministère et des banques."
+      />
+
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatCard
+          label="Investisseurs"
+          value={clients.length}
+          sub={`${users.length} compte${users.length > 1 ? "s" : ""} au total`}
+          icon={<UsersThreeIcon className="size-5" weight="duotone" />}
+        />
+        <StatCard
+          label="Banque liée"
+          value={linked}
+          sub={
+            clients.length - linked > 0
+              ? `${clients.length - linked} sans banque`
+              : "Tous les investisseurs sont liés"
+          }
+          icon={<BankIcon className="size-5" weight="duotone" />}
+          accent="text-emerald-700 bg-emerald-50 ring-emerald-100"
+        />
+        <StatCard
+          label="Ministère & banques"
+          value={staff}
+          sub="Administrateurs et comptes banque"
+          icon={<ShieldCheckIcon className="size-5" weight="duotone" />}
+          accent="text-rdc-navy bg-rdc-navy/10 ring-rdc-navy/15"
+        />
+      </section>
 
       <Card className="border-border/80 bg-card shadow-sm ring-1 ring-rdc-navy/5">
         <CardHeader className="border-b [.border-b]:pb-4">
           <CardTitle className="text-base">Liste des comptes</CardTitle>
           <CardDescription>
-            Clients et administrateurs inscrits sur ekonzo
+            Les souscriptions comptabilisées excluent les tentatives échouées
+            ou annulées.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {users.length === 0 ? (
-            <div className="px-6 py-16 text-center text-sm text-muted-foreground">
-              Aucun utilisateur.
-            </div>
+            <EmptyState
+              icon={<UsersThreeIcon className="size-6" weight="duotone" />}
+              title="Aucun utilisateur"
+            />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="px-4">Utilisateur</TableHead>
-                  <TableHead className="px-4">Téléphone</TableHead>
                   <TableHead className="px-4">Rôle</TableHead>
-                  <TableHead className="px-4">KYC</TableHead>
-                  <TableHead className="px-4">Souscriptions</TableHead>
+                  <TableHead className="px-4">Banque partenaire</TableHead>
+                  <TableHead className="px-4 text-right">Souscriptions</TableHead>
                   <TableHead className="px-4">Inscrit le</TableHead>
                 </TableRow>
               </TableHeader>
@@ -131,50 +143,62 @@ export default async function AdminUsersPage() {
                   >
                     <TableCell className="px-4 py-3 whitespace-normal">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                          {u.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .toUpperCase()
-                            .slice(0, 2)}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium leading-tight">
+                        <Avatar name={u.name} size="sm" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium leading-tight">
                             {u.name}
+                            {u.banned && (
+                              <span className="ml-2 text-xs font-normal text-destructive">
+                                Banni
+                              </span>
+                            )}
                           </p>
-                          {u.banned && (
-                            <p className="text-xs text-destructive">Banni</p>
-                          )}
+                          <p className="truncate text-xs text-muted-foreground">
+                            {u.email}
+                            {u.phoneNumber ? ` · ${u.phoneNumber}` : ""}
+                          </p>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-muted-foreground">
-                      {u.phoneNumber ?? "—"}
-                    </TableCell>
                     <TableCell className="px-4 py-3">
                       <Badge
                         variant="outline"
-                        className={cn("", roleBadgeClass(u.role))}
+                        className={cn(roleClass(u.role))}
                       >
-                        {u.role}
+                        {ROLE_LABELS[u.role] ?? u.role}
                       </Badge>
                     </TableCell>
-                    <TableCell className="px-4 py-3">
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "",
-                          kycBadgeClass(u.kycStatus),
-                        )}
-                      >
-                        {KYC_LABELS[u.kycStatus] ?? u.kycStatus}
-                      </Badge>
+                    <TableCell className="px-4 py-3 whitespace-normal">
+                      {u.role !== "CLIENT" ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : u.bankLink ? (
+                        <div className="flex items-center gap-2">
+                          <BankLogo
+                            logoUrl={u.bankLink.partnerBank.logoUrl}
+                            shortName={u.bankLink.partnerBank.shortName}
+                            size="sm"
+                          />
+                          <div className="leading-tight">
+                            <p className="text-sm font-medium">
+                              {u.bankLink.partnerBank.shortName}
+                            </p>
+                            <p className="font-mono text-[11px] text-muted-foreground">
+                              {maskAccount(u.bankLink.accountNumber)} ·{" "}
+                              {u.bankLink.currency}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                          <LinkBreakIcon className="size-3.5" />
+                          Non liée
+                        </span>
+                      )}
                     </TableCell>
-                    <TableCell className="px-4 py-3">
+                    <TableCell className="px-4 py-3 text-right">
                       <span
                         className={cn(
-                          "text-sm font-semibold",
+                          "text-sm font-semibold tabular-nums",
                           u._count.subscriptions > 0
                             ? "text-primary"
                             : "text-muted-foreground",

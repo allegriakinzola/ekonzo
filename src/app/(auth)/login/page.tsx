@@ -10,17 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
-import {
-  isValidMomoPhone,
-  MOMO_PHONE_ERROR,
-  normalizeMomoPhone,
-} from "@/modules/payments/phone";
 
 const loginSchema = z.object({
-  phoneNumber: z
-    .string()
-    .transform((v) => normalizeMomoPhone(v))
-    .refine(isValidMomoPhone, MOMO_PHONE_ERROR),
+  email: z.string().email("E-mail invalide"),
   password: z.string().min(1, "Mot de passe requis"),
 });
 
@@ -38,12 +30,23 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const email = `${data.phoneNumber}@phone.ekonzo.cd`;
-      const result = await authClient.signIn.email({ email, password: data.password });
+      const result = await authClient.signIn.email({
+        email: data.email.trim().toLowerCase(),
+        password: data.password,
+      });
       if (result.error) throw new Error(result.error.message);
-      router.push("/convention");
+
+      const session = await authClient.getSession();
+      const role = (session.data?.user as { role?: string } | undefined)?.role;
+      if (role === "ADMIN" || role === "SUPER_ADMIN") {
+        router.push("/admin");
+      } else if (role === "BANK") {
+        router.push("/bank");
+      } else {
+        router.push("/dashboard");
+      }
     } catch {
-      setError("Numéro ou mot de passe incorrect.");
+      setError("E-mail ou mot de passe incorrect.");
     } finally {
       setLoading(false);
     }
@@ -51,15 +54,13 @@ export default function LoginPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      {/* Panneau gauche — branding */}
-      <div className="hidden lg:flex flex-col justify-between bg-primary p-12 text-primary-foreground relative overflow-hidden">
-        {/* Bandes drapeau RDC en filigrane */}
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-primary p-12 text-primary-foreground lg:flex">
         <div className="absolute bottom-0 left-0 right-0 flex h-1.5">
           <div className="flex-1 bg-rdc-navy" />
           <div className="w-8 bg-yellow-400" />
           <div className="flex-1 bg-rdc-red" />
         </div>
-        <div className="bg-white rounded-xl p-4 w-fit">
+        <div className="w-fit rounded-xl bg-white p-4">
           <img
             src="/logo.webp"
             alt="Ministère des Finances — RDC"
@@ -70,26 +71,31 @@ export default function LoginPage() {
           <p className="text-3xl font-semibold leading-snug">
             Investissez dans les titres du Trésor de la RDC
           </p>
-          <p className="text-primary-foreground/80 text-sm leading-relaxed">
-            Bons du Trésor, accessibles à tous, dès 10 000 CDF.
-            Rendements garantis par l&apos;État congolais.
+          <p className="text-sm leading-relaxed text-primary-foreground/80">
+            Espace investisseur — connexion par e-mail.
           </p>
         </div>
         <p className="text-xs text-primary-foreground/60">
-          © {new Date().getFullYear()} ekonzo · Ministère des Finances · Kinshasa, RDC
+          © {new Date().getFullYear()} ekonzo · Ministère des Finances ·
+          Kinshasa, RDC
         </p>
       </div>
 
-      {/* Panneau droit — formulaire */}
       <div className="flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm space-y-8">
           <div className="space-y-2">
             <div className="lg:hidden">
-              <img src="/logo.webp" alt="Ministère des Finances" className="h-10 w-auto" />
+              <img
+                src="/logo.webp"
+                alt="Ministère des Finances"
+                className="h-10 w-auto"
+              />
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight">Connexion</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">
+              Connexion investisseur
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Entrez votre numéro de téléphone et votre mot de passe
+              Entrez votre e-mail et votre mot de passe
             </p>
           </div>
 
@@ -99,24 +105,23 @@ export default function LoginPage() {
             </Alert>
           )}
 
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-5"
+          >
             <div className="space-y-2">
-              <Label htmlFor="phone">Numéro de téléphone</Label>
+              <Label htmlFor="email">E-mail</Label>
               <Input
-                id="phone"
-                placeholder="812345678"
-                type="tel"
-                inputMode="numeric"
-                maxLength={9}
+                id="email"
+                placeholder="vous@exemple.com"
+                type="email"
+                autoComplete="email"
                 className="h-11"
-                {...form.register("phoneNumber")}
+                {...form.register("email")}
               />
-              <p className="text-xs text-muted-foreground">
-                9 chiffres, sans 0 ni +243
-              </p>
-              {form.formState.errors.phoneNumber && (
+              {form.formState.errors.email && (
                 <p className="text-xs text-destructive">
-                  {form.formState.errors.phoneNumber.message}
+                  {form.formState.errors.email.message}
                 </p>
               )}
             </div>
@@ -127,13 +132,14 @@ export default function LoginPage() {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
+                  autoComplete="current-password"
                   className="h-11 pr-12"
                   {...form.register("password")}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
                 >
                   {showPassword ? "Masquer" : "Afficher"}
                 </button>
@@ -144,13 +150,27 @@ export default function LoginPage() {
                 </p>
               )}
             </div>
-            <Button type="submit" className="w-full h-11" disabled={loading}>
+            <Button type="submit" className="h-11 w-full" disabled={loading}>
               {loading ? "Connexion…" : "Se connecter"}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
               Pas encore de compte ?{" "}
-              <a href="/register" className="text-primary font-medium hover:underline">
+              <a
+                href="/register"
+                className="font-medium text-primary hover:underline"
+              >
                 Créer un compte
+              </a>
+            </p>
+            <p className="text-center text-xs text-muted-foreground">
+              Banque ?{" "}
+              <a href="/bank/login" className="hover:underline">
+                Espace banque
+              </a>
+              {" · "}
+              Ministère ?{" "}
+              <a href="/ministry/login" className="hover:underline">
+                Espace ministère
               </a>
             </p>
           </form>

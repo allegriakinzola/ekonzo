@@ -1,0 +1,39 @@
+import { requireRole } from "@/lib/session";
+import { Separator } from "@/components/ui/separator";
+import { getBankByUserId } from "@/modules/banks/bank.service";
+import { BankSidebar } from "./components/BankSidebar";
+
+export default async function BankLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await requireRole("BANK", "/bank/login");
+  const bank = await getBankByUserId(session.user.id);
+  const userName = bank?.name ?? session.user.name ?? "Banque";
+
+  return (
+    <div className="flex min-h-screen bg-[linear-gradient(180deg,oklch(0.98_0.01_220)_0%,oklch(0.97_0.005_264)_100%)]">
+      <BankSidebar
+        userName={userName}
+        bankName={bank?.name ?? "Banque partenaire"}
+        shortName={bank?.shortName ?? "Banque"}
+        logoUrl={bank?.logoUrl ?? null}
+      />
+      <div className="flex flex-1 flex-col lg:ml-64">
+        <div className="h-1 w-full bg-[linear-gradient(90deg,var(--rdc-red)_0%,var(--primary)_45%,var(--rdc-navy)_100%)]" />
+        <div className="h-14 lg:hidden" />
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 lg:px-8">
+          {children}
+        </main>
+        <Separator />
+        <footer className="py-5 text-center text-xs text-muted-foreground">
+          <p>
+            © {new Date().getFullYear()} ekonzo ·{" "}
+            {bank?.shortName ?? "Espace banques partenaires"}
+          </p>
+        </footer>
+      </div>
+    </div>
+  );
+}

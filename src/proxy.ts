@@ -2,17 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
 
 /**
- * Proxy RBAC (Next.js 16) — protège les route groups selon l'authentification.
+ * Proxy RBAC (Next.js 16) — protège les routes selon l'authentification.
  *
- * Stratégie :
- *   - Vérification légère du cookie de session au niveau edge (rapide).
- *   - La vérification fine du rôle (CLIENT vs ADMIN) se fait dans les
- *     layouts serveur (client)/layout.tsx et (admin)/layout.tsx.
- *
- * Ici on se contente de rediriger les visiteurs non authentifiés vers /login.
+ * Vérification légère du cookie de session. Les rôles sont contrôlés
+ * dans les layouts serveur de chaque espace.
  */
 
-const PUBLIC_PATHS = ["/login", "/register", "/verify-otp", "/api/auth"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/register",
+  "/bank/login",
+  "/bank/set-password",
+  "/api/bank/set-password",
+  "/idp/",
+  "/ministry/login",
+  "/api/auth",
+  "/api/v1/banks/",
+];
 const PUBLIC_EXACT = ["/"];
 
 export function proxy(req: NextRequest) {
@@ -25,7 +31,12 @@ export function proxy(req: NextRequest) {
   const sessionCookie = getSessionCookie(req);
 
   if (!sessionCookie) {
-    const loginUrl = new URL("/login", req.url);
+    const loginPath = pathname.startsWith("/bank")
+      ? "/bank/login"
+      : pathname.startsWith("/admin") || pathname.startsWith("/ministry")
+        ? "/ministry/login"
+        : "/login";
+    const loginUrl = new URL(loginPath, req.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }

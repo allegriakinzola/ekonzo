@@ -33,14 +33,7 @@ async function main() {
   const rates = await prisma.exchangeRate.deleteMany();
   console.log(`Taux de change : ${rates.count}`);
 
-  // 2. Conventions signées + templates (recréés au besoin)
-  const agreements = await prisma.securitiesAccountAgreement.deleteMany();
-  console.log(`Conventions signées : ${agreements.count}`);
-
-  const conventionTemplates = await prisma.securitiesAccountConvention.deleteMany();
-  console.log(`Modèles de convention : ${conventionTemplates.count}`);
-
-  // 3. Données liées aux clients
+  // 2. Données liées aux clients
   const clients = await prisma.user.findMany({
     where: { role: { notIn: ["ADMIN", "SUPER_ADMIN"] } },
     select: { id: true, phoneNumber: true, name: true },
@@ -52,8 +45,6 @@ async function main() {
   }
 
   if (clientIds.length > 0) {
-    await prisma.kycDraft.deleteMany({ where: { userId: { in: clientIds } } });
-    await prisma.kYC.deleteMany({ where: { userId: { in: clientIds } } });
     await prisma.settlementProfile.deleteMany({ where: { userId: { in: clientIds } } });
     await prisma.notification.deleteMany({ where: { userId: { in: clientIds } } });
     await prisma.momoAccount.deleteMany({ where: { userId: { in: clientIds } } });
@@ -70,8 +61,6 @@ async function main() {
   console.log(`OTP / verifications : ${verifications.count}`);
   const logins = await prisma.loginAttempt.deleteMany();
   console.log(`Login attempts : ${logins.count}`);
-  const drafts = await prisma.kycDraft.deleteMany();
-  console.log(`KYC drafts restants : ${drafts.count}`);
 
   const deletedUsers = await prisma.user.deleteMany({
     where: { role: { notIn: ["ADMIN", "SUPER_ADMIN"] } },
@@ -93,7 +82,6 @@ async function main() {
     users: await prisma.user.count(),
     products: await prisma.product.count(),
     subscriptions: await prisma.subscription.count(),
-    kyc: await prisma.kYC.count(),
   };
   console.log("\nÉtat final :", leftovers);
 }

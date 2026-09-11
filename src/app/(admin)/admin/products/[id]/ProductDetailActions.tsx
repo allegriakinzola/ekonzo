@@ -38,14 +38,15 @@ export function ProductDetailActions({
   }
 
   const DESCRIPTIONS: Record<string, string> = {
-    OPEN: "Le produit devient visible et souscriptible par les investisseurs.",
+    OPEN: "L'annonce devient visible et les investisseurs peuvent souscrire via leur banque partenaire.",
     CLOSED:
-      "La période de souscription est terminée. Les investisseurs ne peuvent plus souscrire.",
+      "La période de souscription est terminée. Les banques transmettent les soumissions à la BCC.",
     ADJUDICATED:
-      "Les souscriptions sont traitées. Vous pouvez maintenant adjuger individuellement.",
-    ACTIVE: "Le produit est actif — les investisseurs détiennent leurs titres.",
+      "Résultats de l'adjudication BCC reçus. Enregistrez les montants retenus dossier par dossier depuis les souscriptions.",
+    ACTIVE:
+      "Les titres sont émis — les investisseurs détiennent leurs Bons / Obligations.",
     MATURED:
-      "Le produit est arrivé à maturité. Le capital est à rembourser.",
+      "L'émission est arrivée à échéance. Le nominal est remboursé aux investisseurs.",
   };
 
   const buttonClass: Record<string, string> = {
@@ -58,20 +59,22 @@ export function ProductDetailActions({
 
   return (
     <Card className="ring-1 ring-rdc-navy/5">
-      <CardHeader>
-        <CardTitle className="text-base">Faire avancer le statut</CardTitle>
-        <CardDescription>{DESCRIPTIONS[nextStatus]}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Button
-          onClick={handleTransition}
-          disabled={loading}
-          className={buttonClass[nextStatus] ?? ""}
-        >
-          <ArrowRightIcon weight="bold" />
-          {loading ? "…" : `Passer en « ${nextLabel} »`}
-        </Button>
-      </CardContent>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader className="flex-1">
+          <CardTitle className="text-base">Étape suivante</CardTitle>
+          <CardDescription>{DESCRIPTIONS[nextStatus]}</CardDescription>
+        </CardHeader>
+        <CardContent className="sm:pt-6">
+          <Button
+            onClick={handleTransition}
+            disabled={loading}
+            className={buttonClass[nextStatus] ?? ""}
+          >
+            <ArrowRightIcon weight="bold" />
+            {loading ? "…" : `Passer en « ${nextLabel} »`}
+          </Button>
+        </CardContent>
+      </div>
     </Card>
   );
 }

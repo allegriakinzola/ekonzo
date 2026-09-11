@@ -1,12 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChartBarIcon, PlusIcon } from "@phosphor-icons/react";
+import {
+  ChartBarIcon,
+  ClockIcon,
+  PlusIcon,
+  StackIcon,
+} from "@phosphor-icons/react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/page-header";
+import { EmptyState, StatCard } from "@/components/data-display";
+import {
+  InstrumentBadge,
+  PRODUCT_STATUS_LABELS,
+  ProductStatusBadge,
+} from "@/components/status-badges";
 import {
   Card,
   CardContent,
@@ -32,23 +43,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatAmount, formatDate } from "@/lib/format";
+import { daysUntil, formatAmount, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import {
+  INSTRUMENT_SHORT,
+  faceValueFromInstrument,
+  formatRatePercent,
+  isObligation,
+  minTicketFromInstrument,
+  resolveInstrument,
+} from "@/modules/products/product.model";
+import type { InstrumentType } from "@prisma/client";
 
 interface Product {
   id: string;
   code: string;
   type: string;
+  instrumentType: string | null;
   currency: string;
+  isin: string | null;
+  lineLabel: string | null;
   faceValue: string;
   minTicket: string;
+  announcedRate: string | null;
   discountRate: string | null;
   couponRate: string | null;
-  couponFrequency: string | null;
+  interestPeriodsPerYear: number | null;
+  principalRepaymentMode: string | null;
   issuanceDate: string;
   maturityDate: string;
   adjudicationDate: string;
   subscriptionDeadline: string;
+  resultsDate: string | null;
+  settlementDate: string | null;
   totalVolume: string;
   allocatedVolume: string;
   status: string;
@@ -56,14 +83,7 @@ interface Product {
   _count: { subscriptions: number };
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Brouillon",
-  OPEN: "Ouvert",
-  CLOSED: "Clôturé",
-  ADJUDICATED: "Adjugé",
-  ACTIVE: "Actif",
-  MATURED: "Échu",
-};
+const STATUS_LABELS = PRODUCT_STATUS_LABELS;
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
   DRAFT: ["OPEN"],
@@ -74,39 +94,48 @@ const STATUS_TRANSITIONS: Record<string, string[]> = {
   MATURED: [],
 };
 
-function statusBadgeClass(status: string) {
-  switch (status) {
-    case "OPEN":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "CLOSED":
-      return "border-amber-200 bg-amber-50 text-amber-800";
-    case "ADJUDICATED":
-      return "border-primary/20 bg-primary/10 text-primary";
-    case "ACTIVE":
-      return "border-rdc-navy/20 bg-rdc-navy/10 text-rdc-navy";
-    default:
-      return "border-border bg-muted text-muted-foreground";
-  }
-}
+const INSTRUMENTS: InstrumentType[] = ["BTI", "BT_USD", "OTI", "OT_USD"];
+
+const emptyForm = {
+  instrumentType: "BTI" as InstrumentType,
+  isin: "",
+  lineLabel: "",
+  code: "",
+  announcedRatePercent: "",
+  totalVolume: "",
+  issuanceDate: "",
+  maturityDate: "",
+  adjudicationDate: "",
+  subscriptionDeadline: "",
+  resultsDate: "",
+  settlementDate: "",
+  interestPeriodsPerYear: "4",
+  principalRepaymentMode: "SEMI_ANNUAL" as
+    | "AT_MATURITY"
+    | "SEMI_ANNUAL"
+    | "ANNUAL",
+};
 
 export function ProductsManager({ initial }: { initial: Product[] }) {
   const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({
-    code: "",
-    currency: "USD",
-    minTicket: "",
-    discountRate: "",
-    issuanceDate: "",
-    maturityDate: "",
-    adjudicationDate: "",
-    subscriptionDeadline: "",
-    totalVolume: "",
-  });
+  const [form, setForm] = useState(emptyForm);
 
-  function field(key: string, value: string) {
+  const isOt =
+    form.instrumentType === "OTI" || form.instrumentType === "OT_USD";
+  const face = faceValueFromInstrument(form.instrumentType);
+  const minTicket = minTicketFromInstrument(form.instrumentType);
+  const currency =
+    form.instrumentType === "BTI" || form.instrumentType === "OTI"
+      ? "CDF"
+      : "USD";
+
+  function field<K extends keyof typeof emptyForm>(
+    key: K,
+    value: (typeof emptyForm)[K],
+  ) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
@@ -115,26 +144,26 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
     setSaving(true);
     setError("");
     try {
-      const minTicket = parseFloat(form.minTicket);
-      const totalVolume = parseFloat(form.totalVolume);
-      if (minTicket > totalVolume) {
-        throw new Error(
-          "Le ticket minimum ne peut pas dépasser le montant total annoncé",
-        );
-      }
       const body = {
-        code: form.code,
-        type: "BT",
-        currency: form.currency,
-        minTicket,
-        // Compat DB : faceValue aligné sur le ticket minimum
-        faceValue: minTicket,
-        discountRate: parseFloat(form.discountRate) / 100,
+        instrumentType: form.instrumentType,
+        isin: form.isin,
+        lineLabel: form.lineLabel,
+        code: form.code || undefined,
+        announcedRatePercent: parseFloat(form.announcedRatePercent),
+        totalVolume: parseFloat(form.totalVolume),
         issuanceDate: form.issuanceDate,
         maturityDate: form.maturityDate,
         adjudicationDate: form.adjudicationDate,
         subscriptionDeadline: form.subscriptionDeadline,
-        totalVolume,
+        resultsDate: form.resultsDate || undefined,
+        settlementDate: form.settlementDate || undefined,
+        interestPeriodsPerYear: isOt
+          ? parseInt(form.interestPeriodsPerYear, 10)
+          : undefined,
+        principalRepaymentMode: isOt
+          ? form.principalRepaymentMode
+          : undefined,
+        publish: true,
       };
       const res = await fetch("/api/admin/products", {
         method: "POST",
@@ -142,8 +171,9 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
         body: JSON.stringify(body),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
+      if (!res.ok) throw new Error(json.error || "Création impossible");
       setShowCreate(false);
+      setForm(emptyForm);
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur");
@@ -161,65 +191,108 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
     if (res.ok) router.refresh();
   }
 
+  const rows = useMemo(() => initial, [initial]);
+  const openCount = rows.filter((p) => p.status === "OPEN").length;
+  const btCount = rows.filter((p) => p.type === "BT").length;
+  const otCount = rows.length - btCount;
+  const totalSubs = rows.reduce((sum, p) => sum + p._count.subscriptions, 0);
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-primary">
-            <ChartBarIcon className="size-5" weight="duotone" />
-            <span className="text-xs font-medium uppercase tracking-wide">
-              Émissions
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-rdc-navy">
-            Produits
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Gestion des Bons du Trésor
-          </p>
-        </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <PlusIcon weight="bold" />
-          Nouveau produit
-        </Button>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Ministère des Finances"
+        icon={<ChartBarIcon className="size-4" weight="duotone" />}
+        title="Émissions"
+        description="Annonces d'adjudication des Bons (BTI, BT USD) et Obligations du Trésor (OTI, OT USD), avec le taux annoncé par le Ministère. Nominal et minimum (10 titres) sont fixés automatiquement."
+        actions={
+          <Button
+            onClick={() => {
+              setForm(emptyForm);
+              setError("");
+              setShowCreate(true);
+            }}
+          >
+            <PlusIcon weight="bold" />
+            Nouvelle annonce
+          </Button>
+        }
+      />
+
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatCard
+          label="Émissions ouvertes"
+          value={openCount}
+          sub={`${rows.length} annonce${rows.length > 1 ? "s" : ""} au total`}
+          icon={<ClockIcon className="size-5" weight="duotone" />}
+          accent="text-emerald-700 bg-emerald-50 ring-emerald-100"
+        />
+        <StatCard
+          label="Bons · Obligations"
+          value={`${btCount} · ${otCount}`}
+          sub="BT (précompte) · OT (intérêts périodiques)"
+          icon={<StackIcon className="size-5" weight="duotone" />}
+          accent="text-rdc-navy bg-rdc-navy/10 ring-rdc-navy/15"
+        />
+        <StatCard
+          label="Souscriptions"
+          value={totalSubs}
+          sub="Toutes émissions, hors abandonnées"
+          icon={<ChartBarIcon className="size-5" weight="duotone" />}
+        />
+      </section>
 
       <Card className="border-border/80 bg-card shadow-sm ring-1 ring-rdc-navy/5">
         <CardHeader className="border-b [.border-b]:pb-4">
           <CardTitle className="text-base">Catalogue</CardTitle>
           <CardDescription>
-            Cliquez une ligne pour ouvrir la fiche produit
+            Cliquez une ligne pour ouvrir la fiche de l&apos;émission
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {initial.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-              <ChartBarIcon
-                className="size-10 text-primary/50"
-                weight="duotone"
-              />
-              <p className="text-sm font-medium">Aucun produit créé</p>
-              <p className="text-xs text-muted-foreground">
-                Créez votre premier Bon du Trésor.
-              </p>
-            </div>
+          {rows.length === 0 ? (
+            <EmptyState
+              icon={<ChartBarIcon className="size-6" weight="duotone" />}
+              title="Aucune émission"
+              description="Publiez la première annonce d'adjudication du Ministère."
+              action={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setForm(emptyForm);
+                    setError("");
+                    setShowCreate(true);
+                  }}
+                >
+                  <PlusIcon weight="bold" />
+                  Nouvelle annonce
+                </Button>
+              }
+            />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="px-4">Code</TableHead>
-                  <TableHead className="px-4">Total / Mini</TableHead>
-                  <TableHead className="px-4">Taux</TableHead>
-                  <TableHead className="px-4">Souscriptions</TableHead>
+                  <TableHead className="px-4">Émission</TableHead>
+                  <TableHead className="px-4">Montant annoncé</TableHead>
+                  <TableHead className="px-4">Taux annoncé</TableHead>
                   <TableHead className="px-4">Clôture</TableHead>
+                  <TableHead className="px-4 text-right">Souscr.</TableHead>
                   <TableHead className="px-4">Statut</TableHead>
                   <TableHead className="px-4 text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {initial.map((p) => {
-                  const rate = p.discountRate;
+                {rows.map((p) => {
+                  const instrument = resolveInstrument({
+                    instrumentType: p.instrumentType as InstrumentType | null,
+                    type: p.type as "BT" | "OT",
+                    currency: p.currency as "CDF" | "USD",
+                  });
+                  const rate =
+                    p.announcedRate ?? p.discountRate ?? p.couponRate;
                   const next = STATUS_TRANSITIONS[p.status]?.[0];
+                  const days = daysUntil(p.subscriptionDeadline);
                   return (
                     <TableRow
                       key={p.id}
@@ -227,11 +300,17 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
                       onClick={() => router.push(`/admin/products/${p.id}`)}
                     >
                       <TableCell className="px-4 py-3 whitespace-normal">
-                        <p className="font-mono text-xs font-semibold">
-                          {p.code}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {p.currency}
+                        <div className="flex items-center gap-2">
+                          <InstrumentBadge
+                            short={INSTRUMENT_SHORT[instrument]}
+                            isObligation={isObligation(instrument)}
+                          />
+                          <p className="truncate text-sm font-semibold text-rdc-navy">
+                            {p.lineLabel ?? p.code}
+                          </p>
+                        </div>
+                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                          {p.isin ?? p.code}
                         </p>
                       </TableCell>
                       <TableCell className="px-4 py-3 whitespace-normal">
@@ -239,28 +318,46 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
                           {formatAmount(p.totalVolume, p.currency)}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          mini {formatAmount(p.minTicket, p.currency)}
+                          nominal {formatAmount(p.faceValue, p.currency)} · mini{" "}
+                          {formatAmount(p.minTicket, p.currency)}
                         </p>
                       </TableCell>
-                      <TableCell className="px-4 py-3 font-semibold text-primary">
-                        {rate ? `${(Number(rate) * 100).toFixed(2)} %` : "—"}
+                      <TableCell className="px-4 py-3 text-base font-bold text-primary">
+                        {formatRatePercent(rate)}
                       </TableCell>
-                      <TableCell className="px-4 py-3">
-                        {p._count.subscriptions}
+                      <TableCell className="px-4 py-3 whitespace-normal">
+                        <p className="text-sm">{formatDate(p.subscriptionDeadline)}</p>
+                        {p.status === "OPEN" && (
+                          <p
+                            className={cn(
+                              "text-[11px]",
+                              days <= 3
+                                ? "font-semibold text-amber-700"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            {days > 0
+                              ? `J-${days}`
+                              : days === 0
+                                ? "Aujourd'hui"
+                                : "Dépassée"}
+                          </p>
+                        )}
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-muted-foreground">
-                        {formatDate(p.subscriptionDeadline)}
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <Badge
-                          variant="outline"
+                      <TableCell className="px-4 py-3 text-right">
+                        <span
                           className={cn(
-                            "",
-                            statusBadgeClass(p.status),
+                            "text-sm font-semibold tabular-nums",
+                            p._count.subscriptions > 0
+                              ? "text-primary"
+                              : "text-muted-foreground",
                           )}
                         >
-                          {STATUS_LABELS[p.status] ?? p.status}
-                        </Badge>
+                          {p._count.subscriptions}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <ProductStatusBadge status={p.status} />
                       </TableCell>
                       <TableCell
                         className="px-4 py-3 text-right"
@@ -292,75 +389,128 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
         >
           <DialogHeader className="border-b border-border pb-4 pr-8">
             <DialogTitle className="text-base text-rdc-navy">
-              Nouveau produit
+              Nouvelle annonce d&apos;adjudication
             </DialogTitle>
             <DialogDescription>
-              Montant total à emprunter + ticket minimum. Les citoyens
-              souscrivent n&apos;importe quel montant entre les deux.
+              Annonce MinFi : instrument, ISIN, taux annoncé, calendrier. Le
+              nominal et le minimum (10 titres) sont fixés automatiquement.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreate} className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="code">Code</Label>
-                <Input
-                  id="code"
-                  required
-                  placeholder="BT-2026-001"
-                  value={form.code}
-                  onChange={(e) => field("code", e.target.value)}
-                  className="h-10 font-mono uppercase"
-                />
+            <div className="space-y-1.5">
+              <Label>Instrument</Label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {INSTRUMENTS.map((inst) => (
+                  <Button
+                    key={inst}
+                    type="button"
+                    variant={
+                      form.instrumentType === inst ? "default" : "outline"
+                    }
+                    onClick={() => field("instrumentType", inst)}
+                    className="h-10"
+                  >
+                    {INSTRUMENT_SHORT[inst]}
+                  </Button>
+                ))}
               </div>
-              <div className="space-y-1.5">
-                <Label>Devise</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {["USD", "CDF"].map((c) => (
-                    <Button
-                      key={c}
-                      type="button"
-                      variant={form.currency === c ? "default" : "outline"}
-                      onClick={() => field("currency", c)}
-                      className="h-10"
-                    >
-                      {c}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Nominal {formatAmount(String(face), currency)} · Mini{" "}
+                {formatAmount(String(minTicket), currency)} (10 titres)
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                id="isin"
+                label="Code ISIN"
+                placeholder="CD000A1XXXX"
+                value={form.isin}
+                onChange={(v) => field("isin", v)}
+                required
+              />
+              <FormField
+                id="code"
+                label="Code interne (optionnel)"
+                placeholder="BTI-2026-001"
+                value={form.code}
+                onChange={(v) => field("code", v)}
+              />
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="lineLabel">Ligne à ouvrir</Label>
+                <Input
+                  id="lineLabel"
+                  required
+                  placeholder="BTI 6 mois 3 mars 2026"
+                  value={form.lineLabel}
+                  onChange={(e) => field("lineLabel", e.target.value)}
+                  className="h-10"
+                />
+              </div>
               <FormField
                 id="totalVolume"
-                label="Montant total annoncé"
-                placeholder="1000000000"
+                label="Montant mis en adjudication"
+                placeholder={currency === "CDF" ? "1000000000" : "5000000"}
                 value={form.totalVolume}
                 onChange={(v) => field("totalVolume", v)}
                 type="number"
                 required
               />
               <FormField
-                id="minTicket"
-                label="Ticket minimum (souscription)"
-                placeholder="10000"
-                value={form.minTicket}
-                onChange={(v) => field("minTicket", v)}
-                type="number"
-                required
-              />
-              <FormField
-                id="discountRate"
-                label="Taux d'escompte (%)"
-                placeholder="12"
-                value={form.discountRate}
-                onChange={(v) => field("discountRate", v)}
+                id="announcedRatePercent"
+                label="Taux annoncé (%)"
+                placeholder="9"
+                value={form.announcedRatePercent}
+                onChange={(v) => field("announcedRatePercent", v)}
                 type="number"
                 step="0.01"
                 required
               />
             </div>
+
+            {isOt && (
+              <div className="grid grid-cols-1 gap-4 rounded-lg border bg-muted/30 p-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="interestPeriodsPerYear">
+                    Paiements d&apos;intérêts / an
+                  </Label>
+                  <select
+                    id="interestPeriodsPerYear"
+                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                    value={form.interestPeriodsPerYear}
+                    onChange={(e) =>
+                      field("interestPeriodsPerYear", e.target.value)
+                    }
+                  >
+                    <option value="1">1 (annuel)</option>
+                    <option value="2">2 (semestriel)</option>
+                    <option value="4">4 (trimestriel)</option>
+                    <option value="12">12 (mensuel)</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="principalRepaymentMode">
+                    Remboursement du principal
+                  </Label>
+                  <select
+                    id="principalRepaymentMode"
+                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                    value={form.principalRepaymentMode}
+                    onChange={(e) =>
+                      field(
+                        "principalRepaymentMode",
+                        e.target.value as typeof form.principalRepaymentMode,
+                      )
+                    }
+                  >
+                    <option value="AT_MATURITY">À l&apos;échéance</option>
+                    <option value="SEMI_ANNUAL">Tous les 6 mois</option>
+                    <option value="ANNUAL">Annuel</option>
+                  </select>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -373,7 +523,7 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
               />
               <FormField
                 id="maturityDate"
-                label="Date de maturité"
+                label="Date de remboursement / maturité"
                 value={form.maturityDate}
                 onChange={(v) => field("maturityDate", v)}
                 type="date"
@@ -389,11 +539,25 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
               />
               <FormField
                 id="subscriptionDeadline"
-                label="Clôture souscription"
+                label="Présentation des soumissions"
                 value={form.subscriptionDeadline}
                 onChange={(v) => field("subscriptionDeadline", v)}
                 type="date"
                 required
+              />
+              <FormField
+                id="resultsDate"
+                label="Annonce des résultats"
+                value={form.resultsDate}
+                onChange={(v) => field("resultsDate", v)}
+                type="date"
+              />
+              <FormField
+                id="settlementDate"
+                label="Date de règlement"
+                value={form.settlementDate}
+                onChange={(v) => field("settlementDate", v)}
+                type="date"
               />
             </div>
 
@@ -414,7 +578,7 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
                 Annuler
               </Button>
               <Button type="submit" className="flex-1" disabled={saving}>
-                {saving ? "Publication…" : "Publier le produit"}
+                {saving ? "Publication…" : "Publier l'annonce"}
               </Button>
             </DialogFooter>
           </form>

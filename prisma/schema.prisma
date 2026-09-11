@@ -17,13 +17,12 @@ datasource db {
 model User {
   id                  String    @id @default(cuid())
   name                String
-  email               String?   @unique
+  email               String    @unique
   emailVerified       Boolean   @default(false)
   image               String?
   phoneNumber         String?   @unique
   phoneNumberVerified Boolean   @default(false)
   role                UserRole  @default(CLIENT)
-  kycStatus           KYCStatus @default(PENDING)
   banned              Boolean   @default(false)
   banReason           String?
   banExpires          DateTime?
@@ -32,7 +31,6 @@ model User {
 
   sessions      Session[]
   accounts      Account[]
-  kyc           KYC?
   wallets       Wallet[]
   momoAccounts  MomoAccount[]
   bankAccounts  BankAccount[]
@@ -40,8 +38,9 @@ model User {
   transactions            Transaction[]
   notifications           Notification[]
   auditLogs               AuditLog[]
-  securitiesAgreements    SecuritiesAccountAgreement[]
   settlementProfile       SettlementProfile?
+  partnerBank             PartnerBank?
+  bankLink                BankLink?
 
   @@map("user")
 }
@@ -92,97 +91,6 @@ model Verification {
   updatedAt  DateTime @updatedAt
 
   @@map("verification")
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// KYC — vérification d'identité
-// ══════════════════════════════════════════════════════════════════════════
-
-model KYC {
-  id           String    @id @default(cuid())
-  userId       String    @unique
-  docType      DocType
-  firstName    String
-  lastName     String
-  postName     String?
-  dateOfBirth  String?
-  docNumber    String?
-  address      String?
-  docFrontUrl  String
-  docBackUrl   String?
-  selfieUrl    String
-  status       KYCStatus @default(PENDING)
-  rejectedNote String?
-  reviewedBy   String?
-  verifiedAt   DateTime?
-  submittedAt  DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-/// Brouillon KYC : recto stocké entre /extract et /verify-face (Vercel /tmp non partagé).
-model KycDraft {
-  userId    String   @id
-  docMime   String   @default("image/jpeg")
-  docBase64 String   @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("kyc_draft")
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// CONVENTION DE COMPTE-TITRES — art. 66 loi 22/069 + Code du numérique
-// ══════════════════════════════════════════════════════════════════════════
-
-/// Version publiée du texte de convention (tenue au nom de la banque partenaire).
-model SecuritiesAccountConvention {
-  id              String   @id @default(cuid())
-  version         String   @unique
-  title           String
-  partnerBankName String
-  bodyMarkdown    String
-  effectiveFrom   DateTime @default(now())
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  agreements SecuritiesAccountAgreement[]
-
-  @@map("securities_account_convention")
-}
-
-/// Acceptation / signature électronique d'un utilisateur pour une version donnée.
-model SecuritiesAccountAgreement {
-  id                 String   @id @default(cuid())
-  userId             String
-  conventionId       String
-  /// Banque choisie pour la tenue du compte-titres (ex. EQUITY_BCDC).
-  partnerBankCode    String
-  partnerBankName    String
-  signedName         String
-  signatureMethod    String   @default("TYPED")
-  signatureHash      String
-  signatureImagePath String?
-  /// Contenu PDF (base64) — requis sur Vercel où /tmp est éphémère.
-  pdfBase64          String?  @db.Text
-  /// PNG signature manuscrite (base64), si méthode DRAWN.
-  signatureImageBase64 String? @db.Text
-  pdfPath            String
-  pdfSha256          String
-  ipAddress          String?
-  userAgent          String?
-  acceptedTerms      Boolean  @default(true)
-  signedAt           DateTime @default(now())
-  createdAt          DateTime @default(now())
-
-  user       User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  convention SecuritiesAccountConvention @relation(fields: [conventionId], references: [id])
-
-  @@unique([userId, conventionId])
-  @@index([userId, signedAt])
-  @@map("securities_account_agreement")
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -264,23 +172,43 @@ model SettlementProfile {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// PRODUIT — Bon du Trésor (BT) ou Obligation du Trésor (OT)
+// PRODUIT — Annonce d'adjudication BT / OT (Ministère des Finances)
 // ══════════════════════════════════════════════════════════════════════════
 
 model Product {
   id                   String           @id @default(cuid())
   code                 String           @unique
+  /** BT | OT — dérivé de instrumentType (compat) */
   type                 ProductType
+  /** BTI | BT_USD | OTI | OT_USD */
+  instrumentType       InstrumentType?
   currency             Currency
+  /** Code ISIN de la ligne */
+  isin                 String?
+  /** Ligne à ouvrir (ex. BTI 6 mois 3 mars 2026) */
+  lineLabel            String?
+  /** Nominal unitaire : 100 000 FC ou 10 USD */
   faceValue            Decimal          @db.Decimal(18, 2)
+  /** Minimum de souscription = 10 × faceValue */
   minTicket            Decimal          @db.Decimal(18, 2)
+  /** Taux annoncé par le MinFi (BT et OT) — fraction ex. 0.09 = 9 % */
+  announcedRate        Decimal?         @db.Decimal(8, 4)
+  /** @deprecated compat — miroir de announcedRate pour BT */
   discountRate         Decimal?         @db.Decimal(8, 4)
+  /** @deprecated compat — miroir de announcedRate pour OT */
   couponRate           Decimal?         @db.Decimal(8, 4)
   couponFrequency      CouponFrequency?
+  /** Nombre de paiements d'intérêts par an (OT, ex. 4 = trimestriel) */
+  interestPeriodsPerYear Int?
+  /** Modalités de remboursement du principal (OT) */
+  principalRepaymentMode PrincipalRepaymentMode?
   issuanceDate         DateTime
   maturityDate         DateTime
   adjudicationDate     DateTime
+  /** Date limite de présentation des soumissions / ordres */
   subscriptionDeadline DateTime
+  resultsDate          DateTime?
+  settlementDate       DateTime?
   totalVolume          Decimal          @db.Decimal(18, 2)
   allocatedVolume      Decimal          @default(0) @db.Decimal(18, 2)
   status               ProductStatus    @default(DRAFT)
@@ -299,7 +227,10 @@ model Subscription {
   id              String             @id @default(cuid())
   userId          String
   productId       String
+  /** Montant nominal souscrit (units × faceValue) */
   amount          Decimal            @db.Decimal(18, 2)
+  /** Montant à régler à la banque (BT : précompté ; OT : au pair) */
+  settlementAmount Decimal?          @db.Decimal(18, 2)
   currency        Currency
   units           Int
   paymentChannel  PaymentChannel
@@ -323,6 +254,7 @@ model Subscription {
   bankAccount  BankAccount?  @relation(fields: [bankAccountId], references: [id])
   transactions Transaction[]
   coupons      Coupon[]
+  paymentSession BankPaymentSession?
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -440,11 +372,186 @@ model LoginAttempt {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// BANQUES COMMERCIALES PARTENAIRES — gérées par le Ministère
+// ══════════════════════════════════════════════════════════════════════════
+
+model PartnerBank {
+  id                String          @id @default(cuid())
+  code              String          @unique
+  name              String
+  shortName         String
+  email             String          @unique
+  logoUrl           String?
+  isActive          Boolean         @default(true)
+  userId            String?         @unique
+  invitedAt         DateTime?
+  activatedAt       DateTime?
+  /** Identifiants OAuth pour interop ekonzo ↔ banque */
+  oauthClientId     String?
+  oauthClientSecret String?
+  /** SIMULATED = IdP hébergé sur ekonzo ; EXTERNAL = URLs banque réelle */
+  interopMode       BankInteropMode @default(SIMULATED)
+  authorizeUrl      String?
+  tokenUrl          String?
+  userinfoUrl       String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  user         User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  invites      BankInviteToken[]
+  customers    BankCustomer[]
+  links        BankLink[]
+  oauthSessions BankOAuthSession[]
+  paymentSessions BankPaymentSession[]
+
+  @@map("partner_bank")
+}
+
+model BankInviteToken {
+  id        String    @id @default(cuid())
+  bankId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  bank PartnerBank @relation(fields: [bankId], references: [id], onDelete: Cascade)
+
+  @@index([bankId])
+  @@map("bank_invite_token")
+}
+
+/** Clients bancaires simulés (internet banking) — gérés dans l'espace banque */
+model BankCustomer {
+  id            String   @id @default(cuid())
+  partnerBankId String
+  email         String
+  passwordHash  String
+  fullName      String
+  accountNumber String
+  accountName   String
+  currency      Currency @default(CDF)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  partnerBank PartnerBank @relation(fields: [partnerBankId], references: [id], onDelete: Cascade)
+
+  @@unique([partnerBankId, email])
+  @@unique([partnerBankId, accountNumber])
+  @@index([partnerBankId])
+  @@map("bank_customer")
+}
+
+/** Liaison active User ekonzo ↔ une banque partenaire (une seule à la fois) */
+model BankLink {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  partnerBankId  String
+  bankCustomerId String
+  customerEmail  String
+  fullName       String
+  accountNumber  String
+  accountName    String
+  currency       Currency
+  linkedAt       DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partnerBank PartnerBank @relation(fields: [partnerBankId], references: [id], onDelete: Restrict)
+
+  @@index([partnerBankId])
+  @@map("bank_link")
+}
+
+/** Session OAuth Authorization Code (interop) */
+model BankOAuthSession {
+  id             String    @id @default(cuid())
+  partnerBankId  String
+  userId         String
+  state          String    @unique
+  redirectUri    String
+  code           String?   @unique
+  codeExpiresAt  DateTime?
+  accessToken    String?   @unique
+  tokenExpiresAt DateTime?
+  bankCustomerId String?
+  consumedAt     DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime  @default(now())
+
+  partnerBank PartnerBank @relation(fields: [partnerBankId], references: [id], onDelete: Cascade)
+
+  @@index([partnerBankId])
+  @@index([userId])
+  @@map("bank_oauth_session")
+}
+
+/** Session de paiement interop ekonzo ↔ banque (souscription titres publics) */
+model BankPaymentSession {
+  id             String            @id @default(cuid())
+  partnerBankId  String
+  userId         String
+  subscriptionId String            @unique
+  /** Jeton opaque pour l'UI banque /pay */
+  token          String            @unique
+  amount         Decimal           @db.Decimal(18, 2)
+  currency       Currency
+  productLabel   String
+  instrumentKind String
+  accountNumber  String
+  accountName    String
+  status         BankPaymentStatus @default(PENDING)
+  /** Moyen de paiement choisi côté banque */
+  method         BankPaymentMethod @default(BANK_ACCOUNT)
+  /** Mobile Money (via agrégateur de la banque — simulé EasyPay) */
+  momoPhone       String?
+  momoOrderRef    String?
+  momoProviderRef String?
+  momoStatus      String?
+  failureReason   String?
+  notifyRef      String?
+  paidAt         DateTime?
+  returnUrl      String
+  expiresAt      DateTime
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  partnerBank  PartnerBank  @relation(fields: [partnerBankId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([partnerBankId])
+  @@index([userId])
+  @@index([token])
+  @@index([momoOrderRef])
+  @@index([momoProviderRef])
+  @@map("bank_payment_session")
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // ENUMS
 // ══════════════════════════════════════════════════════════════════════════
 
+enum BankInteropMode {
+  SIMULATED
+  EXTERNAL
+}
+
+enum BankPaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+}
+
+enum BankPaymentMethod {
+  BANK_ACCOUNT
+  MOBILE_MONEY
+}
+
 enum UserRole {
   CLIENT
+  BANK
   ADMIN
   SUPER_ADMIN
 }
@@ -454,24 +561,22 @@ enum Currency {
   USD
 }
 
-enum DocType {
-  CNI
-  PASSPORT
-  PERMIS
-}
-
-enum KYCStatus {
-  PENDING
-  SUBMITTED
-  VERIFIED
-  REJECTED
-  UNDER_REVIEW
-  APPROVED
-}
-
 enum ProductType {
   BT
   OT
+}
+
+enum InstrumentType {
+  BTI
+  BT_USD
+  OTI
+  OT_USD
+}
+
+enum PrincipalRepaymentMode {
+  AT_MATURITY
+  SEMI_ANNUAL
+  ANNUAL
 }
 
 enum ProductStatus {
@@ -550,5 +655,4 @@ enum NotificationType {
   COUPON_PAID
   MATURITY_REMINDER
   REIMBURSEMENT_DONE
-  KYC_STATUS_CHANGED
 }

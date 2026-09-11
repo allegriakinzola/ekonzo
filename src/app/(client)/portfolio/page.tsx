@@ -73,13 +73,21 @@ export default async function PortfolioPage() {
           maturityDate: true,
           discountRate: true,
           couponRate: true,
+          announcedRate: true,
+          instrumentType: true,
+          lineLabel: true,
         },
       },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  const activeSubscriptions = subscriptions.filter((s) =>
+  /** Tentatives abandonnées — pas des souscriptions au sens métier */
+  const discarded = new Set(["FAILED", "CANCELLED"]);
+  const realSubscriptions = subscriptions.filter((s) => !discarded.has(s.status));
+  const failedSubscriptions = subscriptions.filter((s) => discarded.has(s.status));
+
+  const activeSubscriptions = realSubscriptions.filter((s) =>
     [
       "ACTIVE",
       "ADJUDICATED",
@@ -161,13 +169,16 @@ export default async function PortfolioPage() {
               Souscriptions
             </CardDescription>
             <CardTitle className="text-2xl font-bold tracking-tight">
-              {subscriptions.length}
+              {realSubscriptions.length}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
               {activeSubscriptions.length} active
               {activeSubscriptions.length > 1 ? "s" : ""}
+              {failedSubscriptions.length > 0
+                ? ` · ${failedSubscriptions.length} échouée${failedSubscriptions.length > 1 ? "s" : ""} exclue${failedSubscriptions.length > 1 ? "s" : ""}`
+                : ""}
             </p>
           </CardContent>
         </Card>
@@ -189,7 +200,7 @@ export default async function PortfolioPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {subscriptions.length === 0 ? (
+          {realSubscriptions.length === 0 ? (
             <div className="space-y-4 px-6 py-16 text-center">
               <p className="font-semibold text-base">Aucune souscription</p>
               <p className="text-sm text-muted-foreground">
@@ -212,8 +223,12 @@ export default async function PortfolioPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {subscriptions.map((s) => {
-                  const rate = s.adjudicatedRate ?? s.product.discountRate;
+                {realSubscriptions.map((s) => {
+                  const rate =
+                    s.adjudicatedRate ??
+                    s.product.announcedRate ??
+                    s.product.discountRate ??
+                    s.product.couponRate;
                   return (
                     <TableRow key={s.id}>
                       <TableCell className="px-4 py-3">
@@ -222,10 +237,10 @@ export default async function PortfolioPage() {
                             variant="outline"
                             className="border-primary/20 bg-primary/10 text-primary"
                           >
-                            BT
+                            {s.product.type}
                           </Badge>
                           <span className="font-mono text-xs">
-                            {s.product.code}
+                            {s.product.lineLabel ?? s.product.code}
                           </span>
                         </div>
                       </TableCell>

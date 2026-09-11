@@ -19,6 +19,11 @@ export interface AppSidebarProps {
   statusColor: "emerald" | "amber" | "violet" | "slate";
   navItems: SidebarNavItem[];
   alert?: React.ReactNode;
+  logoutHref?: string;
+  /** Logo partenaire (ex. banque) — remplace le logo ekonzo dans l'en-tête */
+  brandLogoSrc?: string | null;
+  brandTitle?: string;
+  brandSubtitle?: string;
 }
 
 const STATUS_COLORS = {
@@ -34,6 +39,10 @@ export function AppSidebar({
   statusColor,
   navItems,
   alert,
+  logoutHref = "/login",
+  brandLogoSrc,
+  brandTitle = "ekonzo",
+  brandSubtitle = "Ministère des Finances · RDC",
 }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -48,26 +57,35 @@ export function AppSidebar({
 
   async function handleSignOut() {
     await authClient.signOut();
-    router.push("/login");
+    router.push(logoutHref);
   }
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b">
-        <Image
-          src="/logo.webp"
-          alt="ekonzo"
-          width={36}
-          height={36}
-          className="object-contain flex-shrink-0"
-        />
+        {brandLogoSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={brandLogoSrc}
+            alt={brandTitle}
+            className="h-9 w-9 flex-shrink-0 rounded-md border bg-white object-contain p-0.5"
+          />
+        ) : (
+          <Image
+            src="/logo.webp"
+            alt="ekonzo"
+            width={36}
+            height={36}
+            className="object-contain flex-shrink-0"
+          />
+        )}
         <div>
           <p className="text-sm font-bold tracking-tight text-primary leading-none">
-            ekonzo
+            {brandTitle}
           </p>
           <p className="text-[10px] text-muted-foreground leading-none mt-0.5">
-            Ministère des Finances · RDC
+            {brandSubtitle}
           </p>
         </div>
       </div>
@@ -146,8 +164,17 @@ export function AppSidebar({
       {/* Mobile top bar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between h-14 px-4 border-b bg-white">
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo.webp" alt="ekonzo" width={28} height={28} className="object-contain" />
-          <span className="text-sm font-bold text-primary">ekonzo</span>
+          {brandLogoSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={brandLogoSrc}
+              alt={brandTitle}
+              className="h-7 w-7 rounded border bg-white object-contain p-0.5"
+            />
+          ) : (
+            <Image src="/logo.webp" alt="ekonzo" width={28} height={28} className="object-contain" />
+          )}
+          <span className="text-sm font-bold text-primary">{brandTitle}</span>
         </Link>
         <button
           onClick={() => setOpen(true)}
@@ -168,7 +195,7 @@ export function AppSidebar({
           />
           <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-72 bg-white flex flex-col shadow-2xl">
             <div className="flex items-center justify-between px-5 py-4 border-b">
-              <span className="text-sm font-bold text-primary">ekonzo</span>
+              <span className="text-sm font-bold text-primary">{brandTitle}</span>
               <button
                 onClick={() => setOpen(false)}
                 className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-muted"

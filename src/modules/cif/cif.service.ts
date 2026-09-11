@@ -1,36 +1,15 @@
-import path from "path";
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/prisma";
 
+const DISCARDED = ["FAILED", "CANCELLED"] as const;
+
 export type CifClient = Awaited<ReturnType<typeof fetchCifClients>>[number];
 
-function appBaseUrl() {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    process.env.BETTER_AUTH_URL?.replace(/\/$/, "") ||
-    "http://localhost:3000"
-  );
-}
-
-/** Construit une URL admin vers un fichier KYC (basename du chemin disque). */
-export function kycFileApiUrl(
-  absOrRelPath: string | null | undefined,
-  userId: string,
-): string {
-  if (!absOrRelPath) return "";
-  const filename = absOrRelPath.split(/[\\/]/).pop();
-  if (!filename) return "";
-  return `${appBaseUrl()}/api/kyc/file/${userId}/${filename}`;
-}
-
-export function conventionPdfApiUrl(userId: string): string {
-  return `${appBaseUrl()}/api/admin/cif/${userId}/convention`;
-}
-
-export function signatureApiUrl(userId: string): string {
-  return `${appBaseUrl()}/api/admin/cif/${userId}/signature`;
-}
-
+/**
+ * Fichier client (CIF) : identité, banque partenaire liée et activité de
+ * souscription. Le règlement passe exclusivement par la banque liée ;
+ * aucun profil de règlement ni compte Mobile Money n'est conservé côté ekonzo.
+ */
 export async function fetchCifClients(userId?: string) {
   return prisma.user.findMany({
     where: {
@@ -39,17 +18,22 @@ export async function fetchCifClients(userId?: string) {
     },
     orderBy: { createdAt: "desc" },
     include: {
-      kyc: true,
-      settlementProfile: true,
-      momoAccounts: { orderBy: { createdAt: "desc" } },
-      bankAccounts: { orderBy: { createdAt: "desc" } },
-      securitiesAgreements: {
+      bankLink: {
         include: {
-          convention: { select: { version: true, title: true } },
+          partnerBank: {
+            select: { code: true, name: true, shortName: true, logoUrl: true },
+          },
         },
-        orderBy: { signedAt: "desc" },
       },
-      _count: { select: { subscriptions: true } },
+      subscriptions: {
+        where: { status: { notIn: [...DISCARDED] } },
+        select: {
+          amount: true,
+          currency: true,
+          status: true,
+          createdAt: true,
+        },
+      },
     },
   });
 }
@@ -64,15 +48,24 @@ function boolFr(v: boolean | null | undefined): string {
   return v ? "Oui" : "Non";
 }
 
-/** Une ligne CIF par client (convention = dernière signature). */
+export function clientActivity(u: CifClient) {
+  const cdf = u.subscriptions
+    .filter((s) => s.currency === "CDF")
+    .reduce((sum, s) => sum + Number(s.amount), 0);
+  const usd = u.subscriptions
+    .filter((s) => s.currency === "USD")
+    .reduce((sum, s) => sum + Number(s.amount), 0);
+  const last = u.subscriptions.reduce<Date | null>(
+    (acc, s) => (!acc || s.createdAt > acc ? s.createdAt : acc),
+    null,
+  );
+  return { count: u.subscriptions.length, cdf, usd, last };
+}
+
+/** Une ligne CIF par client. */
 export function clientToCifRow(u: CifClient) {
-  const kyc = u.kyc;
-  const settlement = u.settlementProfile;
-  const agreement = u.securitiesAgreements[0] ?? null;
-  const defaultMomo =
-    u.momoAccounts.find((a) => a.isDefault) ?? u.momoAccounts[0] ?? null;
-  const defaultBank =
-    u.bankAccounts.find((a) => a.isDefault) ?? u.bankAccounts[0] ?? null;
+  const link = u.bankLink;
+  const activity = clientActivity(u);
 
   return {
     userId: u.id,
@@ -81,112 +74,50 @@ export function clientToCifRow(u: CifClient) {
     email: u.email ?? "",
     banned: boolFr(u.banned),
     createdAt: fmtDate(u.createdAt),
-    subscriptionCount: u._count.subscriptions,
 
-    kycStatus: u.kycStatus,
-    kycDocType: kyc?.docType ?? "",
-    kycFirstName: kyc?.firstName ?? "",
-    kycLastName: kyc?.lastName ?? "",
-    kycPostName: kyc?.postName ?? "",
-    kycDateOfBirth: kyc?.dateOfBirth ?? "",
-    kycDocNumber: kyc?.docNumber ?? "",
-    kycAddress: kyc?.address ?? "",
-    kycSubmittedAt: fmtDate(kyc?.submittedAt),
-    kycVerifiedAt: fmtDate(kyc?.verifiedAt),
-    kycRejectedNote: kyc?.rejectedNote ?? "",
-    kycDocFrontUrl: kyc
-      ? kycFileApiUrl(kyc.docFrontUrl, u.id)
-      : "",
-    kycSelfieUrl: kyc ? kycFileApiUrl(kyc.selfieUrl, u.id) : "",
+    bankCode: link?.partnerBank.code ?? "",
+    bankName: link?.partnerBank.name ?? "",
+    bankShortName: link?.partnerBank.shortName ?? "",
+    bankCustomerId: link?.bankCustomerId ?? "",
+    bankCustomerEmail: link?.customerEmail ?? "",
+    bankAccountName: link?.accountName ?? "",
+    bankAccountNumber: link?.accountNumber ?? "",
+    bankCurrency: link?.currency ?? "",
+    linkedAt: fmtDate(link?.linkedAt),
 
-    settlementChannel: settlement?.preferredChannel ?? "",
-    settlementMomoPhone: settlement?.momoPhone ?? "",
-    settlementBankName: settlement?.bankName ?? "",
-    settlementBankAccountNumber: settlement?.bankAccountNumber ?? "",
-    settlementBankAccountName: settlement?.bankAccountName ?? "",
-
-    momoOperator: defaultMomo?.operator ?? "",
-    momoPhone: defaultMomo?.phoneNumber ?? "",
-    momoAccountName: defaultMomo?.accountName ?? "",
-
-    bankName: defaultBank?.bankName ?? "",
-    bankAccountNumber: defaultBank?.accountNumber ?? "",
-    bankAccountName: defaultBank?.accountName ?? "",
-    bankCurrency: defaultBank?.currency ?? "",
-    bankChannel: defaultBank?.channel ?? "",
-
-    conventionSigned: boolFr(!!agreement),
-    conventionVersion: agreement?.convention.version ?? "",
-    conventionTitle: agreement?.convention.title ?? "",
-    partnerBankCode: agreement?.partnerBankCode ?? "",
-    partnerBankName: agreement?.partnerBankName ?? "",
-    signedName: agreement?.signedName ?? "",
-    signatureMethod: agreement?.signatureMethod ?? "",
-    signedAt: fmtDate(agreement?.signedAt),
-    signatureHash: agreement?.signatureHash ?? "",
-    pdfSha256: agreement?.pdfSha256 ?? "",
-    conventionPdfUrl: agreement ? conventionPdfApiUrl(u.id) : "",
-    signatureImageUrl: agreement?.signatureImagePath
-      ? signatureApiUrl(u.id)
-      : agreement?.signatureMethod === "TYPED"
-        ? `(signature tapée : ${agreement.signedName})`
-        : "",
-    agreementIp: agreement?.ipAddress ?? "",
+    subscriptionCount: activity.count,
+    volumeCdf: activity.cdf,
+    volumeUsd: activity.usd,
+    lastSubscriptionAt: fmtDate(activity.last),
   };
 }
 
-const CIF_COLUMNS: { header: string; key: keyof ReturnType<typeof clientToCifRow>; width: number }[] = [
+const CIF_COLUMNS: {
+  header: string;
+  key: keyof ReturnType<typeof clientToCifRow>;
+  width: number;
+}[] = [
   { header: "ID utilisateur", key: "userId", width: 28 },
   { header: "Nom affiché", key: "name", width: 28 },
   { header: "Téléphone", key: "phoneNumber", width: 16 },
   { header: "Email", key: "email", width: 28 },
   { header: "Banni", key: "banned", width: 10 },
   { header: "Inscrit le", key: "createdAt", width: 20 },
+
+  { header: "Banque — Code", key: "bankCode", width: 12 },
+  { header: "Banque — Nom", key: "bankName", width: 28 },
+  { header: "Banque — Sigle", key: "bankShortName", width: 12 },
+  { header: "Banque — ID client", key: "bankCustomerId", width: 22 },
+  { header: "Banque — Email client", key: "bankCustomerEmail", width: 28 },
+  { header: "Compte — Titulaire", key: "bankAccountName", width: 24 },
+  { header: "Compte — Numéro", key: "bankAccountNumber", width: 20 },
+  { header: "Compte — Devise", key: "bankCurrency", width: 10 },
+  { header: "Banque liée le", key: "linkedAt", width: 20 },
+
   { header: "Nb souscriptions", key: "subscriptionCount", width: 14 },
-
-  { header: "KYC — Statut", key: "kycStatus", width: 14 },
-  { header: "KYC — Type doc", key: "kycDocType", width: 12 },
-  { header: "KYC — Prénom", key: "kycFirstName", width: 16 },
-  { header: "KYC — Nom", key: "kycLastName", width: 16 },
-  { header: "KYC — Post-nom", key: "kycPostName", width: 16 },
-  { header: "KYC — Date naissance", key: "kycDateOfBirth", width: 14 },
-  { header: "KYC — N° document", key: "kycDocNumber", width: 16 },
-  { header: "KYC — Adresse", key: "kycAddress", width: 32 },
-  { header: "KYC — Soumis le", key: "kycSubmittedAt", width: 20 },
-  { header: "KYC — Vérifié le", key: "kycVerifiedAt", width: 20 },
-  { header: "KYC — Motif rejet", key: "kycRejectedNote", width: 24 },
-  { header: "KYC — URL recto", key: "kycDocFrontUrl", width: 40 },
-  { header: "KYC — URL selfie", key: "kycSelfieUrl", width: 40 },
-
-  { header: "Règlement — Canal", key: "settlementChannel", width: 16 },
-  { header: "Règlement — MoMo", key: "settlementMomoPhone", width: 16 },
-  { header: "Règlement — Banque", key: "settlementBankName", width: 20 },
-  { header: "Règlement — N° compte", key: "settlementBankAccountNumber", width: 18 },
-  { header: "Règlement — Titulaire", key: "settlementBankAccountName", width: 22 },
-
-  { header: "MoMo — Opérateur", key: "momoOperator", width: 12 },
-  { header: "MoMo — Téléphone", key: "momoPhone", width: 16 },
-  { header: "MoMo — Nom compte", key: "momoAccountName", width: 20 },
-
-  { header: "Banque — Nom", key: "bankName", width: 18 },
-  { header: "Banque — N° compte", key: "bankAccountNumber", width: 18 },
-  { header: "Banque — Titulaire", key: "bankAccountName", width: 20 },
-  { header: "Banque — Devise", key: "bankCurrency", width: 10 },
-  { header: "Banque — Canal", key: "bankChannel", width: 10 },
-
-  { header: "Convention — Signée", key: "conventionSigned", width: 12 },
-  { header: "Convention — Version", key: "conventionVersion", width: 12 },
-  { header: "Convention — Titre", key: "conventionTitle", width: 36 },
-  { header: "Banque partenaire — Code", key: "partnerBankCode", width: 16 },
-  { header: "Banque partenaire — Nom", key: "partnerBankName", width: 22 },
-  { header: "Signataire", key: "signedName", width: 24 },
-  { header: "Méthode signature", key: "signatureMethod", width: 14 },
-  { header: "Signé le", key: "signedAt", width: 20 },
-  { header: "Hash signature", key: "signatureHash", width: 40 },
-  { header: "SHA-256 PDF", key: "pdfSha256", width: 40 },
-  { header: "URL PDF convention", key: "conventionPdfUrl", width: 44 },
-  { header: "URL / détail signature", key: "signatureImageUrl", width: 44 },
-  { header: "IP signature", key: "agreementIp", width: 16 },
+  { header: "Volume souscrit (CDF)", key: "volumeCdf", width: 20 },
+  { header: "Volume souscrit (USD)", key: "volumeUsd", width: 20 },
+  { header: "Dernière souscription", key: "lastSubscriptionAt", width: 20 },
 ];
 
 export async function buildCifWorkbook(userId?: string): Promise<{
@@ -225,51 +156,9 @@ export async function buildCifWorkbook(userId?: string): Promise<{
   for (const row of rows) {
     sheet.addRow(row);
   }
+  sheet.getColumn("volumeCdf").numFmt = "#,##0.00";
+  sheet.getColumn("volumeUsd").numFmt = "#,##0.00";
 
-  // Feuille détail conventions (toutes les signatures)
-  const agrSheet = workbook.addWorksheet("Conventions", {
-    views: [{ state: "frozen", ySplit: 1 }],
-  });
-  agrSheet.columns = [
-    { header: "ID utilisateur", key: "userId", width: 28 },
-    { header: "Nom", key: "name", width: 24 },
-    { header: "Téléphone", key: "phone", width: 16 },
-    { header: "Version", key: "version", width: 12 },
-    { header: "Banque", key: "bank", width: 22 },
-    { header: "Signataire", key: "signedName", width: 24 },
-    { header: "Méthode", key: "method", width: 12 },
-    { header: "Signé le", key: "signedAt", width: 20 },
-    { header: "URL PDF", key: "pdfUrl", width: 44 },
-    { header: "URL signature", key: "sigUrl", width: 44 },
-    { header: "SHA-256 PDF", key: "sha", width: 40 },
-  ];
-  const agrHeader = agrSheet.getRow(1);
-  agrHeader.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  agrHeader.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FF0B3D5C" },
-  };
-
-  for (const u of clients) {
-    for (const a of u.securitiesAgreements) {
-      agrSheet.addRow({
-        userId: u.id,
-        name: u.name,
-        phone: u.phoneNumber ?? "",
-        version: a.convention.version,
-        bank: a.partnerBankName,
-        signedName: a.signedName,
-        method: a.signatureMethod,
-        signedAt: fmtDate(a.signedAt),
-        pdfUrl: conventionPdfApiUrl(u.id),
-        sigUrl: a.signatureImagePath ? signatureApiUrl(u.id) : "",
-        sha: a.pdfSha256,
-      });
-    }
-  }
-
-  // Feuille méta
   const meta = workbook.addWorksheet("Métadonnées");
   meta.addRow(["Plateforme", "ekonzo — Ministère des Finances RDC"]);
   meta.addRow(["Type", "CIF (Customer Information File)"]);
@@ -277,10 +166,10 @@ export async function buildCifWorkbook(userId?: string): Promise<{
   meta.addRow(["Nombre de clients", clients.length]);
   meta.addRow([
     "Contenu",
-    "Identité, KYC, règlement, comptes MoMo/banque, convention compte-titres + liens documents",
+    "Identité, banque partenaire liée, compte de règlement, activité de souscription (hors tentatives échouées/annulées)",
   ]);
   meta.getColumn(1).width = 22;
-  meta.getColumn(2).width = 80;
+  meta.getColumn(2).width = 100;
 
   const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
   const stamp = new Date().toISOString().slice(0, 10);
@@ -289,14 +178,4 @@ export async function buildCifWorkbook(userId?: string): Promise<{
     : `CIF-ekonzo-clients-${stamp}.xlsx`;
 
   return { buffer, filename, count: clients.length };
-}
-
-/** Résout le chemin absolu d'un fichier convention (anti path-traversal). */
-export function resolveConventionFile(
-  uploadDir: string,
-  relativePath: string,
-): string | null {
-  const absolute = path.join(uploadDir, relativePath);
-  if (!absolute.startsWith(uploadDir)) return null;
-  return absolute;
 }

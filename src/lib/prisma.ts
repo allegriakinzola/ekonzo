@@ -11,29 +11,44 @@ neonConfig.pipelineConnect = false;
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  prismaSchemaVersion?: string;
 };
+
+/** Incrémenter après ajout de modèles pour invalider le singleton HMR en dev */
+const SCHEMA_VERSION = "bank-payment-momo-v1";
 
 const connectionString = process.env.DATABASE_URL!;
 
-// PoolConfig : le client Prisma singleton réutilise le pool entre les navigations.
-const adapter = new PrismaNeon({
-  connectionString,
-  max: 10,
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 10_000,
-});
+function createPrismaClient() {
+  const adapter = new PrismaNeon({
+    connectionString,
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+  });
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+  return new PrismaClient({
     adapter,
-    // Les logs "query" ralentissent fortement le rendu en dev (console Windows).
     log:
       process.env.PRISMA_LOG_QUERIES === "1"
         ? ["query", "error", "warn"]
         : ["error"],
   });
+}
+
+const cached =
+  globalForPrisma.prisma &&
+  globalForPrisma.prismaSchemaVersion === SCHEMA_VERSION &&
+  typeof (globalForPrisma.prisma as { bankLink?: unknown }).bankLink !==
+    "undefined" &&
+  typeof (globalForPrisma.prisma as { bankPaymentSession?: unknown })
+    .bankPaymentSession !== "undefined"
+    ? globalForPrisma.prisma
+    : undefined;
+
+export const prisma = cached ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
+  globalForPrisma.prismaSchemaVersion = SCHEMA_VERSION;
 }

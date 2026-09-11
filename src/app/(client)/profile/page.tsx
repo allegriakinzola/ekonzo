@@ -1,249 +1,296 @@
+import Link from "next/link";
 import {
+  ArrowRightIcon,
+  BankIcon,
+  CalendarBlankIcon,
+  EnvelopeSimpleIcon,
+  GearSixIcon,
   IdentificationCardIcon,
   LockIcon,
-  UserCircleIcon,
+  PhoneIcon,
+  ReceiptIcon,
+  ShieldCheckIcon,
 } from "@phosphor-icons/react/dist/ssr";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { formatDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { getSettlementProfile } from "@/modules/settlement/settlement.service";
-import { cn } from "@/lib/utils";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-
-const KYC_LABELS: Record<string, string> = {
-  PENDING: "Non soumis",
-  SUBMITTED: "En cours de vérif.",
-  UNDER_REVIEW: "En révision",
-  VERIFIED: "Vérifié",
-  APPROVED: "Approuvé",
-  REJECTED: "Rejeté",
-};
-
-function kycBadgeClass(status: string) {
-  switch (status) {
-    case "VERIFIED":
-    case "APPROVED":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "REJECTED":
-      return "border-destructive/20 bg-destructive/10 text-destructive";
-    case "SUBMITTED":
-    case "UNDER_REVIEW":
-      return "border-amber-200 bg-amber-50 text-amber-800";
-    default:
-      return "border-border bg-muted text-muted-foreground";
-  }
-}
-
-const DOC_LABELS: Record<string, string> = {
-  CNI: "Carte Nationale d'Identité",
-  PASSPORT: "Passeport",
-  PERMIS: "Permis de conduire",
-};
+import { getActiveBankLink } from "@/modules/banks/bank-link.service";
+import { InfoList, InfoRow } from "@/components/info-list";
+import { PageHeader } from "@/components/page-header";
 
 export default async function ProfilePage() {
   const session = await requireRole("CLIENT");
 
-  const [user, settlement] = await Promise.all([
+  const [user, bankLink, subscriptionCount] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: {
         id: true,
         name: true,
+        email: true,
         phoneNumber: true,
-        kycStatus: true,
         createdAt: true,
-        kyc: {
-          select: {
-            firstName: true,
-            lastName: true,
-            postName: true,
-            docType: true,
-            status: true,
-            submittedAt: true,
-            verifiedAt: true,
-          },
-        },
-        _count: { select: { subscriptions: true } },
       },
     }),
-    getSettlementProfile(session.user.id),
+    getActiveBankLink(session.user.id),
+    prisma.subscription.count({
+      where: {
+        userId: session.user.id,
+        status: { notIn: ["FAILED", "CANCELLED"] },
+      },
+    }),
   ]);
 
   if (!user) return null;
 
-  return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="space-y-1">
-        <div className="flex items-center gap-2 text-primary">
-          <UserCircleIcon className="size-5" weight="duotone" />
-          <span className="text-xs font-medium uppercase tracking-wide">
-            Compte
-          </span>
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-rdc-navy">
-          Mon profil
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Informations de votre compte ekonzo
-        </p>
-      </div>
+  const initials = user.name
+    .split(" ")
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 
+  return (
+    <div className="mx-auto max-w-3xl space-y-8">
+      <PageHeader
+        eyebrow="Paramètres"
+        icon={<GearSixIcon className="size-4" weight="duotone" />}
+        title="Mon compte"
+        description="Vos informations personnelles et la banque partenaire utilisée pour vos souscriptions."
+      />
+
+      {/* Identité */}
       <Card className="ring-1 ring-rdc-navy/5">
-        <CardHeader className="border-b [.border-b]:pb-4">
-          <div className="flex items-center gap-4">
-            <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
-              {user.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .toUpperCase()
-                .slice(0, 2)}
-            </div>
-            <div className="space-y-1">
-              <CardTitle className="text-lg">{user.name}</CardTitle>
+        <CardContent className="flex flex-col gap-5 sm:flex-row sm:items-center">
+          <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--primary)_0%,var(--rdc-navy)_100%)] text-xl font-bold text-white shadow-sm">
+            {initials}
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="truncate text-lg font-semibold text-rdc-navy">
+                {user.name}
+              </h2>
               <Badge
                 variant="outline"
-                className={cn(kycBadgeClass(user.kycStatus))}
+                className="border-emerald-200 bg-emerald-50 text-emerald-700"
               >
-                {KYC_LABELS[user.kycStatus] ?? user.kycStatus}
+                Investisseur
               </Badge>
             </div>
+            <p className="truncate text-sm text-muted-foreground">
+              {user.email}
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-3 pt-4 sm:grid-cols-2">
-          <Field label="Numéro de téléphone" value={user.phoneNumber ?? "—"} />
-          <Field label="Membre depuis" value={formatDate(user.createdAt)} />
-          <Field
-            label="Souscriptions"
-            value={`${user._count.subscriptions} au total`}
-          />
+          <div className="grid grid-cols-2 gap-6 border-t pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6">
+            <Kpi label="Souscriptions" value={subscriptionCount} />
+            <Kpi
+              label="Membre depuis"
+              value={new Date(user.createdAt).getFullYear()}
+            />
+          </div>
         </CardContent>
       </Card>
 
-      {user.kyc && (
-        <Card className="ring-1 ring-rdc-navy/5">
-          <CardHeader className="border-b [.border-b]:pb-4">
-            <div className="flex items-center gap-2">
-              <IdentificationCardIcon
-                className="size-5 text-primary"
-                weight="duotone"
-              />
+      {/* Informations */}
+      <Card className="ring-1 ring-rdc-navy/5">
+        <CardHeader className="border-b [.border-b]:pb-4">
+          <div className="flex items-center gap-3">
+            <SectionIcon>
+              <IdentificationCardIcon className="size-4" weight="duotone" />
+            </SectionIcon>
+            <div>
+              <CardTitle className="text-base">Informations personnelles</CardTitle>
+              <CardDescription>
+                Données de votre compte ekonzo
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-1">
+          <InfoList>
+            <InfoRow
+              label="Nom complet"
+              icon={<IdentificationCardIcon className="size-3.5" />}
+              value={user.name}
+            />
+            <InfoRow
+              label="Adresse e-mail"
+              icon={<EnvelopeSimpleIcon className="size-3.5" />}
+              value={user.email ?? "—"}
+            />
+            <InfoRow
+              label="Téléphone"
+              icon={<PhoneIcon className="size-3.5" />}
+              value={user.phoneNumber ?? "—"}
+              muted={!user.phoneNumber}
+            />
+            <InfoRow
+              label="Inscription"
+              icon={<CalendarBlankIcon className="size-3.5" />}
+              value={formatDate(user.createdAt)}
+            />
+            <InfoRow
+              label="Souscriptions"
+              icon={<ReceiptIcon className="size-3.5" />}
+              value={`${subscriptionCount} au total`}
+            />
+          </InfoList>
+        </CardContent>
+      </Card>
+
+      {/* Banque partenaire */}
+      <Card className="ring-1 ring-rdc-navy/5">
+        <CardHeader className="border-b [.border-b]:pb-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <SectionIcon>
+                <BankIcon className="size-4" weight="duotone" />
+              </SectionIcon>
               <div>
-                <CardTitle className="text-base">
-                  Vérification d&apos;identité (KYC)
-                </CardTitle>
+                <CardTitle className="text-base">Banque partenaire</CardTitle>
                 <CardDescription>
-                  Informations issues de votre dossier
+                  Compte teneur utilisé pour régler vos souscriptions
                 </CardDescription>
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-3 pt-4 sm:grid-cols-2">
-            <Field label="Prénom" value={user.kyc.firstName} />
-            <Field label="Nom" value={user.kyc.lastName} />
-            {user.kyc.postName && (
-              <Field label="Post-nom" value={user.kyc.postName} />
-            )}
-            <Field
-              label="Type de document"
-              value={DOC_LABELS[user.kyc.docType] ?? user.kyc.docType}
-            />
-            <Field label="Soumis le" value={formatDate(user.kyc.submittedAt)} />
-            {user.kyc.verifiedAt && (
-              <Field label="Vérifié le" value={formatDate(user.kyc.verifiedAt)} />
-            )}
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                Statut
-              </p>
-              <Badge
-                variant="outline"
-                className={cn(kycBadgeClass(user.kyc.status))}
-              >
-                {KYC_LABELS[user.kyc.status] ?? user.kyc.status}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card className="ring-1 ring-rdc-navy/5">
-        <CardHeader className="border-b [.border-b]:pb-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-base">Profil de règlement</CardTitle>
-              <CardDescription>
-                Canal préféré pour payer vos souscriptions
-              </CardDescription>
-            </div>
             <Badge
               variant="outline"
-              className={cn(
-                settlement.isComplete
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-amber-200 bg-amber-50 text-amber-800",
-              )}
+              className={
+                bankLink
+                  ? "shrink-0 border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "shrink-0 border-amber-200 bg-amber-50 text-amber-800"
+              }
             >
-              {settlement.isComplete ? "Configuré" : "À compléter"}
+              {bankLink ? "Liée" : "Non liée"}
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3 pt-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field
-              label="Canal préféré"
-              value={
-                settlement.preferredChannel === "MOBILE_MONEY"
-                  ? "Mobile Money"
-                  : "Virement bancaire"
-              }
-            />
-            <Field
-              label="Mobile Money"
-              value={settlement.momoPhone ?? "—"}
-            />
-            <Field label="Banque" value={settlement.bankName ?? "—"} />
-            <Field
-              label="N° de compte"
-              value={settlement.bankAccountNumber ?? "—"}
-            />
-          </div>
-          <Button render={<Link href="/settlement" />} size="sm">
-            {settlement.isComplete ? "Modifier" : "Configurer"}
-          </Button>
+
+        <CardContent className="pt-1">
+          {bankLink ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 pt-3">
+                <BankLogo
+                  logoUrl={bankLink.partnerBank.logoUrl}
+                  shortName={bankLink.partnerBank.shortName}
+                />
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-rdc-navy">
+                    {bankLink.partnerBank.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {bankLink.partnerBank.shortName} · liée le{" "}
+                    {formatDate(bankLink.linkedAt)}
+                  </p>
+                </div>
+              </div>
+              <InfoList className="border-t">
+                <InfoRow label="Titulaire" value={bankLink.accountName} />
+                <InfoRow
+                  label="Numéro de compte"
+                  value={bankLink.accountNumber}
+                  mono
+                />
+                <InfoRow label="Devise du compte" value={bankLink.currency} />
+              </InfoList>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <div className="flex size-12 items-center justify-center rounded-full bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                <BankIcon className="size-6" weight="duotone" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-rdc-navy">
+                  Aucune banque liée
+                </p>
+                <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
+                  Les souscriptions aux titres publics passent par votre
+                  banque. Liez-la pour pouvoir souscrire.
+                </p>
+              </div>
+            </div>
+          )}
         </CardContent>
+
+        <CardFooter className="justify-between gap-3 bg-muted/30">
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <ShieldCheckIcon className="size-3.5" weight="duotone" />
+            Connexion sécurisée via votre banque
+          </p>
+          <Button
+            size="sm"
+            variant={bankLink ? "outline" : "default"}
+            render={<Link href="/profile/bank" />}
+          >
+            {bankLink ? "Changer de banque" : "Lier ma banque"}
+            <ArrowRightIcon className="size-3.5" weight="bold" />
+          </Button>
+        </CardFooter>
       </Card>
 
-      <Alert>
-        <LockIcon className="size-4" />
-        <AlertTitle>Sécurité</AlertTitle>
-        <AlertDescription>
-          Pour modifier vos informations personnelles ou votre mot de passe,
+      {/* Sécurité */}
+      <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-4 py-3.5 text-xs leading-relaxed text-muted-foreground">
+        <LockIcon className="mt-0.5 size-4 shrink-0" weight="duotone" />
+        <p>
+          <span className="font-medium text-foreground">Sécurité.</span> Pour
+          modifier vos informations personnelles ou votre mot de passe,
           contactez le support ekonzo.
-        </AlertDescription>
-      </Alert>
+        </p>
+      </div>
     </div>
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Kpi({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="min-w-[88px]">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="mt-0.5 text-sm font-semibold">{value}</p>
+      <p className="mt-0.5 text-xl font-bold tracking-tight text-rdc-navy">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SectionIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
+      {children}
+    </div>
+  );
+}
+
+function BankLogo({
+  logoUrl,
+  shortName,
+}: {
+  logoUrl: string | null;
+  shortName: string;
+}) {
+  return logoUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={logoUrl}
+      alt={shortName}
+      className="size-12 shrink-0 rounded-lg border bg-white object-contain p-1"
+    />
+  ) : (
+    <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border bg-white text-sm font-bold text-rdc-navy">
+      {shortName.slice(0, 2).toUpperCase()}
     </div>
   );
 }

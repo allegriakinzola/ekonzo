@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPaymentProvider } from "@/modules/payments/payment.service";
 import { applyPaymentResult } from "@/modules/payments/payment.confirm";
+import {
+  applyMomoResultToSession,
+  findMomoSessionByRefs,
+} from "@/modules/banks/bank-payment.service";
 
 /**
  * POST /api/payments/ipn
@@ -32,6 +36,35 @@ export async function POST(req: NextRequest) {
     // mais journaliser.
     console.warn("[EasyPay IPN] Payload non reconnu");
     return NextResponse.json({ received: true, ignored: true });
+  }
+
+  // Paiement Mobile Money initié côté banque partenaire (interop) ?
+  const bankSession = await findMomoSessionByRefs(
+    payload.orderRef,
+    payload.providerRef,
+  );
+  if (bankSession) {
+    let status = payload.status;
+    if (status === "SUCCESS") {
+      try {
+        const verified = await provider.checkStatus(
+          payload.providerRef || bankSession.momoProviderRef || "",
+        );
+        if (verified.status !== "SUCCESS") status = verified.status;
+      } catch (err) {
+        console.error("[EasyPay IPN] Vérification banque échouée:", err);
+      }
+    }
+    const applied = await applyMomoResultToSession(
+      bankSession,
+      status,
+      payload.providerRef,
+    );
+    return NextResponse.json({
+      received: true,
+      scope: "bank_interop",
+      status: applied.status,
+    });
   }
 
   const result = await applyPaymentResult({

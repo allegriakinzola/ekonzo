@@ -51,12 +51,7 @@ async function main() {
   await prisma.transaction.deleteMany({ where: { userId: { in: ids } } });
   await prisma.notification.deleteMany({ where: { userId: { in: ids } } });
   await prisma.auditLog.deleteMany({ where: { userId: { in: ids } } });
-  await prisma.kycDraft.deleteMany({ where: { userId: { in: ids } } });
-  await prisma.kYC.deleteMany({ where: { userId: { in: ids } } });
   await prisma.settlementProfile.deleteMany({ where: { userId: { in: ids } } });
-  await prisma.securitiesAccountAgreement.deleteMany({
-    where: { userId: { in: ids } },
-  });
   await prisma.momoAccount.deleteMany({ where: { userId: { in: ids } } });
   await prisma.bankAccount.deleteMany({ where: { userId: { in: ids } } });
   await prisma.wallet.deleteMany({ where: { userId: { in: ids } } });

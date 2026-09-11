@@ -14,7 +14,7 @@ const NAV_ITEMS = [
   { href: "/profile", label: "Mon profil", icon: "⊙" },
 ];
 
-export function ClientHeader({ userName, kycStatus }: { userName: string; kycStatus: string }) {
+export function ClientHeader({ userName }: { userName: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -66,14 +66,6 @@ export function ClientHeader({ userName, kycStatus }: { userName: string; kycSta
 
         {/* Right section */}
         <div className="flex items-center gap-2">
-          {/* KYC badge */}
-          {kycStatus !== "VERIFIED" && (
-            <span className="hidden sm:flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Identité non vérifiée
-            </span>
-          )}
-
           {/* Avatar menu */}
           <div className="relative">
             <button
@@ -89,9 +81,6 @@ export function ClientHeader({ userName, kycStatus }: { userName: string; kycSta
                 <div className="absolute right-0 top-11 z-20 w-56 rounded-xl border bg-white shadow-lg py-1">
                   <div className="px-4 py-3 border-b">
                     <p className="text-sm font-semibold truncate">{userName}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {kycStatus === "VERIFIED" ? "✓ Identité vérifiée" : "⚠ Vérification en attente"}
-                    </p>
                   </div>
                   <Link href="/profile" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-muted" onClick={() => setMenuOpen(false)}>
                     Mon profil

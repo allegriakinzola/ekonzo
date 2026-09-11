@@ -7,7 +7,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await requireRole(["ADMIN", "SUPER_ADMIN"]);
+  const session = await requireRole(["ADMIN", "SUPER_ADMIN"], "/ministry/login");
   const userName = session.user.name ?? "Administrateur";
   const role = (session.user as { role?: string }).role ?? "ADMIN";
 
@@ -17,7 +17,7 @@ export default async function AdminLayout({
       <div className="flex flex-1 flex-col lg:ml-64">
         <div className="h-1 w-full bg-[linear-gradient(90deg,var(--rdc-red)_0%,var(--primary)_45%,var(--rdc-navy)_100%)]" />
         <div className="lg:hidden h-14" />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 lg:px-8">
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 lg:px-8">
           {children}
         </main>
         <Separator />

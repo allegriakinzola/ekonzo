@@ -4,11 +4,9 @@ import {
   CalendarBlankIcon,
   ChartLineUpIcon,
   HouseIcon,
-  IdentificationCardIcon,
   PlusIcon,
-  WarningCircleIcon,
-  ClockIcon,
   StackIcon,
+  WarningCircleIcon,
 } from "@phosphor-icons/react/dist/ssr";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -27,9 +25,9 @@ import {
   getCommittedVolumes,
   volumeLeft as calcVolumeLeft,
 } from "@/lib/product-volume";
-import { getUserKycStatus, hasSignedConvention, requireRole } from "@/lib/session";
-import { getSettlementProfile } from "@/modules/settlement/settlement.service";
+import { requireRole } from "@/lib/session";
 import { cn } from "@/lib/utils";
+import { getActiveBankLink } from "@/modules/banks/bank-link.service";
 
 const QUICK_ACTIONS = [
   {
@@ -45,10 +43,10 @@ const QUICK_ACTIONS = [
     icon: ChartLineUpIcon,
   },
   {
-    href: "/convention",
-    label: "Convention compte-titres",
-    desc: "Ouvrez votre compte auprès de la banque",
-    icon: IdentificationCardIcon,
+    href: "/profile/bank",
+    label: "Ma banque",
+    desc: "Banque partenaire liée pour payer",
+    icon: BriefcaseIcon,
   },
 ];
 
@@ -56,12 +54,7 @@ export default async function DashboardPage() {
   const session = await requireRole("CLIENT");
   const userName = session.user.name ?? "Utilisateur";
   const firstName = userName.split(" ")[0];
-  // Partagé avec le layout (React cache) — pas de 2ᵉ requête
-  const kycStatus = await getUserKycStatus(session.user.id);
-  const kycSubmitted =
-    kycStatus === "SUBMITTED" || kycStatus === "UNDER_REVIEW";
-  const conventionSigned = await hasSignedConvention(session.user.id);
-  const settlement = await getSettlementProfile(session.user.id);
+  const bankLink = await getActiveBankLink(session.user.id);
 
   const [subscriptions, openProducts, openCount] = await Promise.all([
     prisma.subscription.findMany({
@@ -89,7 +82,10 @@ export default async function DashboardPage() {
 
   const committedMap = await getCommittedVolumes(openProducts.map((p) => p.id));
 
-  const activeOrAdjudicated = subscriptions.filter((s) =>
+  const realSubscriptions = subscriptions.filter(
+    (s) => s.status !== "FAILED" && s.status !== "CANCELLED",
+  );
+  const activeOrAdjudicated = realSubscriptions.filter((s) =>
     ["ADJUDICATED", "ACTIVE", "PAYMENT_CONFIRMED", "SUBMITTED"].includes(s.status)
   );
   const investedUsd = activeOrAdjudicated
@@ -121,8 +117,8 @@ export default async function DashboardPage() {
     },
     {
       label: "Souscriptions",
-      value: subscriptions.length.toString(),
-      sub: `${subscriptions.filter((s) => s.status === "PENDING_PAYMENT").length} en attente de paiement`,
+      value: realSubscriptions.length.toString(),
+      sub: `${realSubscriptions.filter((s) => s.status === "PENDING_PAYMENT").length} en attente de paiement`,
       icon: ChartLineUpIcon,
       accent: "text-emerald-700 bg-emerald-50 ring-emerald-100",
     },
@@ -165,87 +161,23 @@ export default async function DashboardPage() {
         </Button>
       </div>
 
-      {kycStatus !== "VERIFIED" && (
-        <Alert
-          className={cn(
-            kycSubmitted
-              ? "border-primary/20 bg-primary/5 text-primary"
-              : "border-amber-200 bg-amber-50 text-amber-950",
-          )}
-        >
-          {kycSubmitted ? (
-            <ClockIcon className="size-4 text-primary" weight="fill" />
-          ) : (
-            <WarningCircleIcon className="size-4 text-amber-700" weight="fill" />
-          )}
-          <AlertTitle className={kycSubmitted ? "text-primary" : "text-amber-900"}>
-            {kycSubmitted
-              ? "Dossier KYC en cours de vérification"
-              : "Vérifiez votre identité pour investir"}
-          </AlertTitle>
-          <AlertDescription
-            className={cn(
-              "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
-              kycSubmitted ? "text-primary/80" : "text-amber-800",
-            )}
-          >
-            <span>
-              {kycSubmitted
-                ? "Votre dossier a été soumis. Un agent va vérifier vos documents sous 24–48h."
-                : "La loi exige la vérification d'identité avant toute souscription. Cela prend moins de 5 minutes."}
-            </span>
-            {!kycSubmitted && (
-              <Button
-                render={<Link href="/profile" />}
-                size="sm"
-                className="bg-amber-700 text-white hover:bg-amber-800"
-              >
-                Voir mon profil
-              </Button>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {kycStatus === "VERIFIED" && !conventionSigned && (
+      {!bankLink && (
         <Alert className="border-amber-200 bg-amber-50 text-amber-950">
           <WarningCircleIcon className="size-4 text-amber-700" weight="fill" />
           <AlertTitle className="text-amber-900">
-            Signez votre convention de compte-titres
+            Liez votre banque partenaire
           </AlertTitle>
           <AlertDescription className="flex flex-col gap-3 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
             <span>
-              Ouvrez votre compte-titres auprès de la banque partenaire pour
-              pouvoir souscrire.
+              Les souscriptions aux titres publics passent par votre banque
+              teneur de compte.
             </span>
             <Button
-              render={<Link href="/convention" />}
+              render={<Link href="/profile/bank" />}
               size="sm"
               className="bg-amber-700 text-white hover:bg-amber-800"
             >
-              Signer maintenant
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {conventionSigned && !settlement.isComplete && (
-        <Alert className="border-amber-200 bg-amber-50 text-amber-950">
-          <WarningCircleIcon className="size-4 text-amber-700" weight="fill" />
-          <AlertTitle className="text-amber-900">
-            Configurez votre profil de règlement
-          </AlertTitle>
-          <AlertDescription className="flex flex-col gap-3 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              Enregistrez votre Mobile Money ou RIB pour préremplir vos
-              prochaines souscriptions.
-            </span>
-            <Button
-              render={<Link href="/settlement" />}
-              size="sm"
-              className="bg-amber-700 text-white hover:bg-amber-800"
-            >
-              Configurer
+              Lier ma banque
             </Button>
           </AlertDescription>
         </Alert>
@@ -340,13 +272,7 @@ export default async function DashboardPage() {
               return (
                 <Link
                   key={p.id}
-                  href={
-                    !conventionSigned
-                      ? "/convention"
-                      : kycStatus !== "VERIFIED"
-                        ? "/profile"
-                        : `/products/${p.id}`
-                  }
+                  href={`/products/${p.id}`}
                   className="group"
                 >
                   <Card className="h-full transition-shadow group-hover:shadow-md ring-1 ring-rdc-navy/5">

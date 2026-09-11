@@ -196,7 +196,7 @@ def build():
     title(s, "ekonzo — souscription digitale aux titres du Trésor", cover=True)
     lead(
         s,
-        "Théorie des Bons & Obligations du Trésor, processus actuel d’achat, puis digitalisation via ekonzo — avec ses contraintes réglementaires.",
+        "Théorie des Bons & Obligations du Trésor, processus actuel, puis le modèle cible : plateforme ekonzo + APIs multi-banques.",
         cover=True,
     )
     stripe_footer(s, "Ministère des Finances · Plateforme ekonzo", cover=True)
@@ -210,9 +210,10 @@ def build():
         "01  Théorie : titres, BT, OT",
         "02  Acheteurs, liquidité bancaire & profils cibles",
         "03  Processus actuel d’achat (BT & OT)",
-        "04  Limites, digitalisation ekonzo",
-        "05  Contraintes qui demeurent",
-        "06  Parcours, paiements & bénéfices",
+        "04  Modèle cible : APIs multi-banques",
+        "05  Parcours, rôles banque & ekonzo",
+        "06  Bénéfices & inclusion bancaire",
+        "07  Cadre juridique & textes applicables",
     ]
     box = s.shapes.add_textbox(Inches(0.7), Inches(2.5), Inches(11), Inches(3.8))
     tf = box.text_frame
@@ -586,87 +587,154 @@ def build():
     )
     stripe_footer(s, "Freins à l’inclusion financière")
 
-    # 13 Digitaliser
+    # 13 Modèle cible API
     s = blank(prs)
-    brand_bar(s, "Partie 3 · Digitalisation")
-    eyebrow(s, "Projet ekonzo")
-    title(s, "Ce que nous voulons digitaliser")
-    lead(s, "ekonzo = canal digital de collecte et d’accompagnement : le citoyen souscrit en ligne ; la banque partenaire reste le teneur de compte-titres.")
+    brand_bar(s, "Partie 3 · Modèle cible")
+    eyebrow(s, "Projet ekonzo · Vision retenue")
+    title(s, "Modèle cible : plateforme + APIs multi-banques")
+    lead(
+        s,
+        "ekonzo = plateforme de référence BT/OT, reliée à toutes les banques partenaires via des APIs — comme « Se connecter avec Google », mais avec sa banque.",
+        y=Inches(2.3),
+    )
+    card(
+        s,
+        Inches(0.4),
+        Inches(3.15),
+        Inches(4.0),
+        Inches(3.2),
+        "Côté citoyen (ekonzo)",
+        [
+            "• Compte sur ekonzo",
+            "• Choix de sa banque",
+            "• Connexion sécurisée compte ↔ ekonzo",
+            "• Catalogue & souscription BT/OT sur ekonzo",
+        ],
+        "n",
+    )
+    card(
+        s,
+        Inches(4.6),
+        Inches(3.15),
+        Inches(4.0),
+        Inches(3.2),
+        "Côté banque",
+        [
+            "• Compte bancaire obligatoire chez elle",
+            "• Elle gère le compte-titres",
+            "• Elle gère le paiement (compte & MoMo)",
+            "• Elle communique via les APIs ekonzo",
+        ],
+        "y",
+    )
+    card(
+        s,
+        Inches(8.8),
+        Inches(3.15),
+        Inches(4.0),
+        Inches(3.2),
+        "Côté banques (B2B)",
+        [
+            "• Chaque banque peut avoir sa plateforme",
+            "• Elle intègre les APIs ekonzo",
+            "• KYC / ouverture : processus à elle",
+            "• Digital, manuel ou hybride — son choix",
+        ],
+        "r",
+    )
+    stripe_footer(s, "ekonzo orchestre les titres · la banque reste maître du compte & du paiement")
+
+    # 14 Qui fait quoi
+    s = blank(prs)
+    brand_bar(s, "Partie 3 · Qui fait quoi")
+    eyebrow(s, "Projet ekonzo · Architecture")
+    title(s, "Qui gère quoi ?")
     card(
         s,
         Inches(0.45),
-        Inches(3.3),
+        Inches(2.45),
         Inches(6.0),
-        Inches(3.2),
-        "À digitaliser",
+        Inches(3.6),
+        "ekonzo (plateforme & APIs)",
         [
-            "• Inscription & authentification (téléphone + OTP)",
-            "• KYC à distance (pièce + selfie)",
-            "• Signature électronique de la convention",
-            "• Catalogue des émissions BT (puis OT)",
-            "• Paiement Mobile Money / virement",
-            "• Suivi du portefeuille & dossier CIF",
+            "• Catalogue des émissions BT / OT",
+            "• Parcours de souscription & suivi",
+            "• APIs vers toutes les banques",
+            "• Connexion compte ↔ banque (type OAuth)",
+            "• APIs pour que les banques bâtissent leur app",
         ],
         "n",
     )
     card(
         s,
         Inches(6.7),
-        Inches(3.3),
+        Inches(2.45),
         Inches(6.0),
-        Inches(3.2),
-        "Ce qui reste bancaire / Trésor",
+        Inches(3.6),
+        "La banque (exécution)",
         [
-            "• Tenue du compte-titres (banque agréée BCC)",
-            "• Participation à l’adjudication",
-            "• Règlement–livraison des titres",
-            "• Calendrier et conditions d’émission (Ministère)",
+            "• Compte-titres : uniquement la banque",
+            "• Paiement compte & Mobile Money : la banque",
+            "• Statut paiement renvoyé via API à ekonzo",
+            "• Adjudication / règlement–livraison",
+            "• Onboarding KYC : politique de chaque banque",
         ],
         "y",
     )
-    stripe_footer(s, "Digitaliser le parcours citoyen, pas remplacer la banque")
+    add_textbox(
+        s,
+        Inches(0.55),
+        Inches(6.2),
+        Inches(12),
+        Inches(0.5),
+        "Prérequis : avoir un compte bancaire auprès de la banque choisie. ekonzo n’est ni teneur de compte-titres, ni processeur de paiement.",
+        size=12,
+        bold=True,
+        color=BLEU_FONCE,
+    )
+    stripe_footer(s, "Séparation claire des responsabilités")
 
-    # 14 Avant / après
+    # 15 Avant / après
     s = blank(prs)
     brand_bar(s, "Partie 3 · Avant / après")
     eyebrow(s, "Projet ekonzo")
-    title(s, "Processus actuel vs parcours ekonzo")
+    title(s, "Processus actuel vs modèle ekonzo (cible)")
     add_table(
         s,
         Inches(0.55),
         Inches(2.45),
         Inches(12.2),
         [
-            ["Étape", "Aujourd’hui (banque)", "Avec ekonzo"],
-            ["Accès", "Agence, clientèle bancaire", "Web / mobile, 24h/24"],
-            ["Identité", "KYC papier en agence", "KYC digital (pièce + selfie)"],
-            ["Compte-titres", "Ouverture longue en banque", "Convention en ligne → banque partenaire"],
-            ["Ordre BT / OT", "Formulaire / guichet", "Choix d’émission + paiement en ligne"],
-            ["Paiement", "Compte bancaire / caisse", "MoMo (Airtel, Orange, M-Pesa) ou virement"],
-            ["Suivi", "Relevés bancaires", "Tableau de bord investisseur"],
+            ["Étape", "Aujourd’hui", "Modèle cible ekonzo"],
+            ["Accès", "Agence, une banque à la fois", "Plateforme ekonzo + éventuelle app banque"],
+            ["Lien banque", "Client déjà en agence", "Connexion compte (type « Se connecter avec… »)"],
+            ["Compte-titres", "Ouverture longue en banque", "Toujours géré par la banque"],
+            ["Ordre BT / OT", "Formulaire / guichet", "Souscription ekonzo ou portail banque (API)"],
+            ["Paiement", "Compte / caisse en agence", "Exécuté par la banque + callback API"],
+            ["KYC / compte", "Papier en agence", "Décidé par chaque banque"],
         ],
         [Inches(2.4), Inches(4.9), Inches(4.9)],
     )
-    stripe_footer(s, "Même titre d’État · parcours citoyen modernisé")
+    stripe_footer(s, "Même titre d’État · orchestration digitale multi-banques")
 
-    # 15 Contraintes
+    # 16 Cadre
     s = blank(prs)
-    brand_bar(s, "Partie 3 · Contraintes")
-    eyebrow(s, "Projet · Cadre légal")
-    title(s, "Contraintes que ekonzo ne peut pas lever seul")
-    lead(s, "La digitalisation accélère le parcours, mais certaines règles restent intangibles.")
+    brand_bar(s, "Partie 3 · Cadre")
+    eyebrow(s, "Projet · Ce qui reste intangible")
+    title(s, "Ce que le modèle ne change pas")
+    lead(s, "Les APIs accélèrent et standardisent ; le cadre bancaire et réglementaire demeure.")
     card(
         s,
         Inches(0.45),
         Inches(3.25),
         Inches(6.0),
         Inches(3.3),
-        "Contraintes majeures",
+        "Toujours côté banque / Trésor",
         [
-            "• Compte-titres obligatoire (loi n°22/069)",
-            "• ekonzo n’est pas teneur de compte-titres",
-            "• L’adjudication reste Trésor / banques",
-            "• Convention écrite + instruction BCC",
+            "• Compte-titres chez une banque agréée BCC",
+            "• Paiement (y compris MoMo) exécuté par la banque",
+            "• Adjudication Trésor / banques",
+            "• Compte bancaire obligatoire chez la banque choisie",
         ],
         "r",
     )
@@ -676,30 +744,29 @@ def build():
         Inches(3.25),
         Inches(6.0),
         Inches(3.3),
-        "Autres points de vigilance",
+        "Liberté de chaque banque",
         [
-            "• Dépendance à un partenariat bancaire",
-            "• KYC / AML obligatoires",
-            "• Arrêté ministériel utile (décret 18/025)",
-            "• Éducation financière BT vs OT",
-            "• Disponibilité réseau / Mobile Money",
+            "• Intégrer ou non les APIs ekonzo",
+            "• Construire sa propre plateforme dessus",
+            "• Choisir son processus KYC / ouverture",
+            "• Définir ses canaux de paiement",
         ],
         "n",
     )
-    stripe_footer(s, "Transparence sur ce qui change… et ce qui ne change pas")
+    stripe_footer(s, "ekonzo ne devient ni banque, ni teneur de compte-titres")
 
-    # 16 Parcours
+    # 17 Parcours
     s = blank(prs)
-    brand_bar(s, "Partie 3 · Parcours ekonzo")
+    brand_bar(s, "Partie 3 · Parcours cible")
     eyebrow(s, "Projet ekonzo")
-    title(s, "Parcours digital cible")
-    lead(s, "De l’inscription à la détention du titre, sans file d’attente en agence.")
+    title(s, "Parcours citoyen (modèle cible)")
+    lead(s, "De la connexion banque à la détention du titre — paiement et compte-titres restent bancaires.")
     steps = [
-        ("01", "Compte", "Téléphone + OTP"),
-        ("02", "KYC", "Pièce d’identité & selfie"),
-        ("03", "Convention", "Compte-titres (banque partenaire)"),
-        ("04", "Souscription", "BT (puis OT) + paiement"),
-        ("05", "Titre", "Adjudication via la banque"),
+        ("01", "Compte ekonzo", "Inscription sur la plateforme"),
+        ("02", "Choisir banque", "Parmi les partenaires API"),
+        ("03", "Connexion", "Lier le compte (type OAuth)"),
+        ("04", "Souscrire", "BT/OT sur ekonzo"),
+        ("05", "Paiement banque", "Compte ou MoMo → callback API"),
     ]
     for i, (n, h, d) in enumerate(steps):
         x = Inches(0.4 + i * 2.55)
@@ -714,75 +781,214 @@ def build():
         Inches(5.8),
         Inches(12),
         Inches(0.5),
-        "Le dossier client (CIF) est transmis à la banque pour ouverture / tenue du compte-titres.",
+        "En parallèle, chaque banque peut offrir le même parcours dans son application en consommant les APIs ekonzo.",
         size=12,
         color=MUTED,
     )
-    stripe_footer(s, "Parcours digital · conformité bancaire respectée")
+    stripe_footer(s, "Deux portes d’entrée : ekonzo · app / portail de la banque")
 
-    # 17 Publics & paiements
+    # 18 Acteurs
     s = blank(prs)
-    brand_bar(s, "Partie 3 · Cibles & paiements")
+    brand_bar(s, "Partie 3 · Acteurs")
     eyebrow(s, "Projet ekonzo")
-    title(s, "Pour qui ? Comment payer ?")
-    card(s, Inches(0.4), Inches(2.45), Inches(4.0), Inches(2.0), "Particuliers", ["Épargne sur titres d’État via Mobile Money — sans parcours 100 % papier."], "n")
-    card(s, Inches(4.6), Inches(2.45), Inches(4.0), Inches(2.0), "Professionnels", ["Placer la trésorerie sur des instruments publics réglementés."], "y")
-    card(s, Inches(8.8), Inches(2.45), Inches(4.0), Inches(2.0), "Diaspora", ["Accéder aux BT / OT sans être physiquement en agence à Kinshasa."], "r")
-    pays = [
-        ("Airtel Money", "Paiement via prompt USSD."),
-        ("Orange Money", "Souscription en quelques secondes."),
-        ("M-Pesa", "Paiement Mobile Money sécurisé."),
-        ("Virement", "Transfert bancaire avec référence."),
-    ]
-    for i, (h, d) in enumerate(pays):
-        card(s, Inches(0.4 + i * 3.2), Inches(4.7), Inches(3.05), Inches(1.6), h, [d], "n")
-    stripe_footer(s, "Inclusion financière · Canaux digitaux")
+    title(s, "Pour qui ? Quel rôle pour les banques ?")
+    card(s, Inches(0.4), Inches(2.45), Inches(4.0), Inches(2.1), "Particuliers & pros", ["Souscrire via ekonzo ou l’app banque — avec un compte chez elle."], "n")
+    card(s, Inches(4.6), Inches(2.45), Inches(4.0), Inches(2.1), "Banques partenaires", ["Paiement & compte-titres ; APIs ; éventuel portail titres propre."], "y")
+    card(s, Inches(8.8), Inches(2.45), Inches(4.0), Inches(2.1), "Gouvernement / Trésor", ["Collecte élargie + inclusion bancaire, sans tenir le compte-titres chez ekonzo."], "r")
+    card(s, Inches(0.4), Inches(4.75), Inches(6.0), Inches(1.7), "Paiements", ["Compte et Mobile Money exécutés par la banque ; confirmation via API à ekonzo."], "n")
+    card(s, Inches(6.7), Inches(4.75), Inches(6.0), Inches(1.7), "Onboarding", ["Chaque banque décide : KYC digital, manuel en agence, ou mix."], "y")
+    stripe_footer(s, "Écosystème ouvert · banques maîtresses de leur clientèle")
 
-    # 18 Bénéfices
+    # 19 Bénéfices
     s = blank(prs)
     brand_bar(s, "Partie 3 · Impact")
     eyebrow(s, "Projet ekonzo")
     title(s, "Bénéfices attendus")
     card(
         s,
-        Inches(0.45),
+        Inches(0.4),
         Inches(2.5),
-        Inches(6.0),
+        Inches(4.0),
         Inches(3.8),
-        "Pour le citoyen",
+        "Citoyen",
         [
-            "• Moins de déplacements, parcours clair",
-            "• Épargne sûre, traçable, suivie en ligne",
-            "• Paiement Mobile Money familier",
-            "• Accès progressif BT puis OT",
+            "• Accès digital aux BT/OT",
+            "• Choix de sa banque",
+            "• Suivi clair des souscriptions",
+            "• Paiement dans l’univers bancaire connu",
+        ],
+        "n",
+    )
+    card(
+        s,
+        Inches(4.6),
+        Inches(2.5),
+        Inches(4.0),
+        Inches(3.8),
+        "Banques",
+        [
+            "• Flux additionnels pour les titres",
+            "• APIs pour leur propre plateforme",
+            "• Maîtrise paiement & compte-titres",
+            "• Contrôle de leur KYC / onboarding",
+        ],
+        "y",
+    )
+    card(
+        s,
+        Inches(8.8),
+        Inches(2.5),
+        Inches(4.0),
+        Inches(3.8),
+        "État",
+        [
+            "• Base d’investisseurs élargie",
+            "• Inclusion bancaire facilitée",
+            "• Canal digital standardisé",
+            "• Cadre légal respecté",
+        ],
+        "r",
+    )
+    stripe_footer(s, "Impact citoyen · banques · Trésor public")
+
+    # 20 Cadre juridique — panorama
+    s = blank(prs)
+    brand_bar(s, "Partie 4 · Droit")
+    eyebrow(s, "Cadre juridique")
+    title(s, "Textes qui couvrent le projet ekonzo")
+    lead(
+        s,
+        "ekonzo s’inscrit dans le droit congolais existant : titres publics, banque, numérique et LBC/FT — sans créer un régime parallèle.",
+        y=Inches(2.3),
+    )
+    card(
+        s,
+        Inches(0.45),
+        Inches(3.2),
+        Inches(6.0),
+        Inches(3.2),
+        "Titres du Trésor",
+        [
+            "• Décret n°18/025 du 11 juin 2018 — BT & OT",
+            "• Titres dématérialisés en comptes-titres",
+            "• Min. Finances : conditions d’émission",
+            "• BCC : registre / règlement–livraison",
         ],
         "n",
     )
     card(
         s,
         Inches(6.7),
-        Inches(2.5),
+        Inches(3.2),
         Inches(6.0),
-        Inches(3.8),
-        "Pour l’État",
+        Inches(3.2),
+        "Banque & compte-titres",
         [
-            "• Élargissement de la base d’investisseurs",
-            "• Mobilisation de l’épargne nationale",
-            "• Canal digital auditable (CIF, KYC)",
-            "• Modernisation Trésor–citoyen, dans le cadre légal",
+            "• Loi n°22/069 du 27 déc. 2022",
+            "• Art. 66 : compte-titres chez établissement agréé BCC",
+            "• ekonzo n’est pas teneur de compte-titres",
+            "• La banque partenaire l’est",
         ],
         "y",
     )
-    stripe_footer(s, "Impact citoyen & Trésor public")
+    stripe_footer(s, "Socle : décret 18/025 · loi 22/069")
 
-    # 19 Conclusion
+    # 21 Cartographie des textes
+    s = blank(prs)
+    brand_bar(s, "Partie 4 · Panorama des textes")
+    eyebrow(s, "Cadre juridique")
+    title(s, "Cartographie des textes applicables")
+    add_table(
+        s,
+        Inches(0.4),
+        Inches(2.35),
+        Inches(12.5),
+        [
+            ["Texte", "Objet", "Couverture ekonzo"],
+            ["Décret n°18/025 (2018)", "BT & OT : émission, remboursement", "Produits, comptes-titres, canal d’émission"],
+            ["Loi n°22/069 (2022)", "Établissements de crédit", "Banque partenaire, art. 66 compte-titres"],
+            ["OL n°23/010 (2023)", "Code du numérique", "Plateforme, signature électronique, APIs"],
+            ["Loi n°22/068 (+ 25/048)", "LBC / FT / prolifération", "KYC / vigilance côté banque"],
+            ["Instructions BCC", "Paiements, agrément, teneurs", "Paiement banque / MoMo"],
+            ["Arrêtés Min. Finances", "Calendrier & conditions d’émission", "Catalogue des émissions via ekonzo"],
+        ],
+        [Inches(3.2), Inches(4.5), Inches(4.8)],
+    )
+    stripe_footer(s, "Tous les piliers du projet sont ancrés dans un texte existant")
+
+    # 22 Implications
+    s = blank(prs)
+    brand_bar(s, "Partie 4 · Conformité opérationnelle")
+    eyebrow(s, "Cadre juridique")
+    title(s, "Ce que cela implique pour ekonzo & les banques")
+    card(
+        s,
+        Inches(0.4),
+        Inches(2.5),
+        Inches(4.0),
+        Inches(3.6),
+        "ekonzo",
+        [
+            "• Canal / plateforme (OL 23/010)",
+            "• Orchestre souscriptions BT/OT",
+            "• APIs multi-banques",
+            "• Pas teneur de compte",
+            "• Preuve électronique",
+        ],
+        "n",
+    )
+    card(
+        s,
+        Inches(4.6),
+        Inches(2.5),
+        Inches(4.0),
+        Inches(3.6),
+        "Banque partenaire",
+        [
+            "• Compte-titres (loi 22/069 art. 66)",
+            "• Exécute les paiements",
+            "• Assujettie LBC/FT (22/068)",
+            "• KYC à sa charge",
+            "• Agréée / supervisée BCC",
+        ],
+        "y",
+    )
+    card(
+        s,
+        Inches(8.8),
+        Inches(2.5),
+        Inches(4.0),
+        Inches(3.6),
+        "État / Trésor / BCC",
+        [
+            "• Émission (Min. Finances)",
+            "• Registre / livraison (BCC)",
+            "• Adjudication & calendrier",
+            "• Contrôle monétaire & bancaire",
+        ],
+        "r",
+    )
+    add_textbox(
+        s,
+        Inches(0.55),
+        Inches(6.25),
+        Inches(12),
+        Inches(0.45),
+        "À retenir : le modèle API multi-banques respecte la séparation légale — ekonzo digitalise l’accès ; banque et Trésor gardent leurs prérogatives.",
+        size=12,
+        bold=True,
+        color=BLEU_FONCE,
+    )
+    stripe_footer(s, "Conformité by design · pas de court-circuit du droit bancaire")
+
+    # 23 Conclusion
     s = blank(prs)
     brand_bar(s, "Gouvernement de la République", cover=True)
     eyebrow(s, "Conclusion", cover=True)
-    title(s, "Digitaliser l’accès, respecter le cadre bancaire", cover=True)
+    title(s, "Une plateforme titres, des banques connectées par API", cover=True)
     lead(
         s,
-        "ekonzo modernise le parcours d’achat des BT et OT, tout en conservant le compte-titres et l’adjudication chez la banque partenaire — pour un Trésor plus accessible, sans court-circuiter la loi.",
+        "ekonzo orchestre les Bons et Obligations du Trésor ; chaque banque gère compte-titres, paiements et onboarding — et peut intégrer nos APIs pour son propre canal digital.",
         cover=True,
     )
     add_textbox(

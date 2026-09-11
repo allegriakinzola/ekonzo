@@ -40,8 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# uploads locaux (KYC, conventions PDF)
+# uploads locaux (KYC, conventions PDF, logos banques)
 /uploads
+/public/uploads
 
 # présentations (hors dépôt — fichier généré dans ../presentations/)
 /public/presentation-titres-tresor.*

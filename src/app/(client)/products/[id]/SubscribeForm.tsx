@@ -1,13 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   BankIcon,
-  CheckCircleIcon,
-  DeviceMobileIcon,
   LockIcon,
-  SpinnerGapIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
 
@@ -23,110 +20,78 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { computeSettlement } from "@/modules/products/pricing";
+import type { InstrumentType, PrincipalRepaymentMode } from "@prisma/client";
 
 interface Product {
   id: string;
-  type: string;
+  instrument: InstrumentType;
   currency: string;
-  minTicket: string;
-  volumeLeft: string;
-  discountRate: string | null;
-  couponRate: string | null;
+  faceValue: number;
+  minUnits: number;
+  volumeLeft: number;
+  annualRate: number;
+  issuanceDate: string;
+  maturityDate: string;
+  interestPeriodsPerYear: number | null;
+  principalRepaymentMode: PrincipalRepaymentMode | null;
+  lineLabel: string;
+  isin: string | null;
 }
 
-type PayPhase =
-  | "form"
-  | "awaiting_ussd"
-  | "confirmed"
-  | "failed"
-  | "bank_pending";
+interface LinkedBank {
+  name: string;
+  shortName: string;
+  logoUrl: string | null;
+  accountNumber: string;
+  accountName: string;
+  currency: string;
+}
+
+function fmt(n: number, currency: string) {
+  return `${Math.round(n).toLocaleString("fr-CD")} ${currency}`;
+}
 
 export function SubscribeForm({
   product,
-  accountPhone,
-  settlement,
+  bank,
 }: {
   product: Product;
-  accountPhone: string;
-  settlement?: {
-    preferredChannel: "MOBILE_MONEY" | "BANK_TRANSFER";
-    momoPhone: string | null;
-    bankName: string | null;
-    bankAccountNumber: string | null;
-    isComplete: boolean;
-  } | null;
+  bank: LinkedBank | null;
 }) {
-  const router = useRouter();
-  const defaultMomo = settlement?.momoPhone || accountPhone || "";
-  const [channel, setChannel] = useState<"MOBILE_MONEY" | "BANK_TRANSFER">(
-    settlement?.preferredChannel ?? "MOBILE_MONEY",
-  );
-  const [amount, setAmount] = useState("");
-  const [momoPhone, setMomoPhone] = useState(defaultMomo);
-  const [bankName, setBankName] = useState(settlement?.bankName ?? "");
-  const [bankAccount, setBankAccount] = useState(
-    settlement?.bankAccountNumber ?? "",
+  const [unitsInput, setUnitsInput] = useState(() =>
+    String(Math.max(1, Number(product.minUnits) || 1)),
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [phase, setPhase] = useState<PayPhase>("form");
-  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
-  const [pollCount, setPollCount] = useState(0);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const minTicket = Number(product.minTicket);
-  const volumeLeft = Number(product.volumeLeft);
-  const amountNum = parseFloat(amount) || 0;
+  const faceValue = Number(product.faceValue) || 1;
+  const minUnits = Math.max(1, Number(product.minUnits) || 1);
+  const units = Math.max(0, parseInt(unitsInput, 10) || 0);
+  const maxUnits = Math.max(
+    0,
+    Math.floor(Number(product.volumeLeft) / faceValue) || 0,
+  );
+  const nominal = units * faceValue;
   const valid =
-    amountNum >= minTicket && amountNum <= volumeLeft && volumeLeft > 0;
+    units >= minUnits && units <= maxUnits && maxUnits > 0 && !!bank;
 
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, []);
-
-  function startPolling(subId: string) {
-    setSubscriptionId(subId);
-    setPhase("awaiting_ussd");
-    setPollCount(0);
-
-    if (pollRef.current) clearInterval(pollRef.current);
-
-    pollRef.current = setInterval(async () => {
-      setPollCount((c) => c + 1);
-      try {
-        const res = await fetch(
-          `/api/subscriptions/${subId}/payment-status`,
-        );
-        if (!res.ok) return;
-        const json = (await res.json()) as { status?: string };
-        if (json.status === "SUCCESS") {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setPhase("confirmed");
-          setTimeout(() => router.push("/portfolio"), 2500);
-        } else if (json.status === "FAILED" || json.status === "CANCELLED") {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setPhase("failed");
-          setError(
-            json.status === "CANCELLED"
-              ? "Paiement annulé sur le menu USSD."
-              : "Paiement refusé. Réessayez plus tard.",
-          );
-        }
-      } catch {
-        // ignore transient network errors during poll
-      }
-    }, 4000);
-
-    // Arrêt après ~3 min
-    setTimeout(() => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    }, 180_000);
-  }
+  const settlement = useMemo(
+    () =>
+      units > 0
+        ? computeSettlement({
+            instrument: product.instrument,
+            units,
+            faceValue,
+            annualRate: product.annualRate,
+            issuanceDate: new Date(product.issuanceDate),
+            maturityDate: new Date(product.maturityDate),
+            interestPeriodsPerYear: product.interestPeriodsPerYear,
+            principalRepaymentMode: product.principalRepaymentMode,
+          })
+        : null,
+    [units, faceValue, product],
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -137,147 +102,41 @@ export function SubscribeForm({
       const res = await fetch("/api/subscriptions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId: product.id,
-          amount: amountNum,
-          paymentChannel: channel,
-          ...(channel === "MOBILE_MONEY"
-            ? { momoPhone: momoPhone.trim() }
-            : { bankName, bankAccount }),
-        }),
+        body: JSON.stringify({ productId: product.id, units }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur lors de la souscription.");
-
-      if (channel === "MOBILE_MONEY") {
-        if (!momoPhone.trim()) {
-          throw new Error(
-            "Aucun numéro Mobile Money. Configurez votre profil de règlement.",
-          );
-        }
-        if (!json.momoPromptSent || !json.id) {
-          throw new Error(
-            json.error ?? "Le prompt USSD n’a pas pu être envoyé.",
-          );
-        }
-        startPolling(json.id as string);
-      } else {
-        setPhase("bank_pending");
-        setTimeout(() => router.push("/portfolio"), 4000);
+      if (!json.redirectUrl) {
+        throw new Error("URL de paiement banque manquante.");
       }
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Erreur lors de la souscription.",
-      );
-    } finally {
+      // Redirection vers l'interface de paiement de la banque (interop)
+      window.location.href = json.redirectUrl as string;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de la souscription.");
       setLoading(false);
     }
   }
 
-  if (phase === "awaiting_ussd" || phase === "confirmed" || phase === "failed") {
+  if (!bank) {
     return (
-      <Card className="ring-1 ring-rdc-navy/5">
+      <Card className="ring-1 ring-amber-200/60">
         <CardContent className="space-y-4 py-8 text-center">
-          <div
-            className={cn(
-              "mx-auto flex size-16 items-center justify-center rounded-full ring-1",
-              phase === "confirmed" &&
-                "bg-emerald-50 text-emerald-700 ring-emerald-100",
-              phase === "failed" &&
-                "bg-destructive/10 text-destructive ring-destructive/20",
-              phase === "awaiting_ussd" &&
-                "bg-primary/10 text-primary ring-primary/20",
-            )}
-          >
-            {phase === "awaiting_ussd" ? (
-              <SpinnerGapIcon className="size-8 animate-spin" weight="bold" />
-            ) : phase === "confirmed" ? (
-              <CheckCircleIcon className="size-8" weight="fill" />
-            ) : (
-              <WarningCircleIcon className="size-8" weight="fill" />
-            )}
-          </div>
-
-          <div>
-            <h3 className="text-lg font-bold text-rdc-navy">
-              {phase === "awaiting_ussd" && "Confirmez sur votre téléphone"}
-              {phase === "confirmed" && "Paiement confirmé"}
-              {phase === "failed" && "Paiement non abouti"}
-            </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {phase === "awaiting_ussd" &&
-                "Un menu USSD / notification Mobile Money a été envoyé."}
-              {phase === "confirmed" &&
-                "Votre souscription est enregistrée. Redirection…"}
-              {phase === "failed" && error}
-            </p>
-          </div>
-
-          {phase === "awaiting_ussd" && (
-            <Alert className="border-primary/20 bg-primary/5 text-left text-primary">
-              <DeviceMobileIcon className="size-4" weight="fill" />
-              <AlertTitle>Prompt USSD envoyé</AlertTitle>
-              <AlertDescription className="text-primary/80">
-                Sur <strong>{accountPhone}</strong>, validez le paiement de{" "}
-                <strong>
-                  {amountNum.toLocaleString("fr-CD")} {product.currency}
-                </strong>{" "}
-                avec votre code PIN Mobile Money.
-                <span className="mt-2 block text-xs opacity-80">
-                  En attente de confirmation
-                  {pollCount > 0 ? ` (${pollCount})` : "…"}
-                  {subscriptionId ? ` · réf. ${subscriptionId.slice(0, 8)}` : ""}
-                </span>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {phase === "failed" && (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setPhase("form");
-                setError("");
-              }}
-            >
-              Réessayer
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (phase === "bank_pending") {
-    return (
-      <Card className="ring-1 ring-rdc-navy/5">
-        <CardContent className="space-y-4 py-8 text-center">
-          <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-            <CheckCircleIcon className="size-8" weight="fill" />
+          <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+            <BankIcon className="size-7" weight="duotone" />
           </div>
           <div>
             <h3 className="text-lg font-bold text-rdc-navy">
-              Souscription enregistrée
+              Liez votre banque pour souscrire
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Effectuez le virement puis conservez votre reçu.
+              Les souscriptions aux titres publics passent par votre banque
+              teneur de compte. Connectez votre banque partenaire, puis revenez
+              sur cette émission.
             </p>
           </div>
-          <Alert className="border-primary/20 bg-primary/5 text-left text-primary">
-            <AlertTitle>Virement bancaire</AlertTitle>
-            <AlertDescription className="text-primary/80">
-              Envoyez{" "}
-              <strong>
-                {amountNum.toLocaleString("fr-CD")} {product.currency}
-              </strong>{" "}
-              vers le compte du Trésor Public.
-            </AlertDescription>
-          </Alert>
-          <p className="text-xs text-muted-foreground">
-            Redirection vers votre portefeuille…
-          </p>
+          <Button size="lg" render={<Link href="/profile/bank" />}>
+            Lier ma banque
+          </Button>
         </CardContent>
       </Card>
     );
@@ -286,159 +145,128 @@ export function SubscribeForm({
   return (
     <Card className="ring-1 ring-rdc-navy/5">
       <CardHeader className="border-b [.border-b]:pb-4">
-        <CardTitle className="text-base">Formulaire de souscription</CardTitle>
+        <CardTitle className="text-base">Demande de souscription</CardTitle>
         <CardDescription>
-          Minimum {minTicket.toLocaleString("fr-CD")} {product.currency} ·{" "}
-          Disponible {volumeLeft.toLocaleString("fr-CD")} {product.currency}.
-          Vous pouvez souscrire n&apos;importe quel montant dans cet intervalle.
+          Nominal unitaire {fmt(faceValue, product.currency)} · minimum{" "}
+          {minUnits} titres · {maxUnits.toLocaleString("fr-CD")} titres
+          disponibles.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="pt-4">
         <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="flex items-center gap-3 rounded-xl border bg-muted/40 p-3">
+            {bank.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={bank.logoUrl}
+                alt={bank.shortName}
+                className="h-10 w-10 rounded-md border bg-white object-contain p-0.5"
+              />
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-white text-xs font-bold text-rdc-navy">
+                {bank.shortName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-rdc-navy">{bank.name}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {bank.accountName} · {bank.accountNumber} · {bank.currency}
+              </p>
+            </div>
+            <Link
+              href="/profile/bank"
+              className="text-xs text-primary hover:underline"
+            >
+              Changer
+            </Link>
+          </div>
+
           <div className="space-y-1.5">
-            <Label htmlFor="amount">
-              Montant à investir ({product.currency})
-            </Label>
+            <Label htmlFor="units">Nombre de titres</Label>
             <div className="relative">
               <Input
-                id="amount"
+                id="units"
                 type="number"
-                min={minTicket}
-                max={volumeLeft}
-                step="any"
-                placeholder={minTicket.toString()}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                min={minUnits}
+                max={maxUnits > 0 ? maxUnits : undefined}
+                step={1}
+                value={unitsInput}
+                onChange={(e) => setUnitsInput(e.target.value)}
                 className="h-11 pr-16"
                 required
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-                {product.currency}
+                titres
               </span>
             </div>
-            {amountNum > 0 && (
-              <p
-                className={cn(
-                  "text-xs",
-                  valid ? "text-emerald-600" : "text-destructive",
-                )}
-              >
-                {amountNum < minTicket
-                  ? `Minimum requis : ${minTicket.toLocaleString("fr-CD")} ${product.currency}`
-                  : amountNum > volumeLeft
-                    ? `Maximum disponible : ${volumeLeft.toLocaleString("fr-CD")} ${product.currency}`
-                    : `Montant accepté : ${amountNum.toLocaleString("fr-CD")} ${product.currency}`}
+            <p
+              className={cn(
+                "text-xs",
+                units === 0
+                  ? "text-muted-foreground"
+                  : valid
+                    ? "text-emerald-600"
+                    : "text-destructive",
+              )}
+            >
+              {units === 0
+                ? `Saisissez au moins ${minUnits} titres.`
+                : units < minUnits
+                  ? `Minimum ${minUnits} titres (${fmt(minUnits * faceValue, product.currency)}).`
+                  : units > maxUnits
+                    ? `Maximum ${maxUnits.toLocaleString("fr-CD")} titres disponibles.`
+                    : `Montant nominal : ${fmt(nominal, product.currency)}`}
+            </p>
+          </div>
+
+          {settlement && units >= minUnits && (
+            <div className="space-y-2 rounded-xl border bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Récapitulatif
               </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label>Mode de paiement</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {(
-                [
-                  {
-                    value: "MOBILE_MONEY" as const,
-                    label: "Mobile Money",
-                    icon: DeviceMobileIcon,
-                  },
-                  {
-                    value: "BANK_TRANSFER" as const,
-                    label: "Virement bancaire",
-                    icon: BankIcon,
-                  },
-                ] as const
-              ).map((ch) => {
-                const Icon = ch.icon;
-                return (
-                  <button
-                    key={ch.value}
-                    type="button"
-                    onClick={() => setChannel(ch.value)}
-                    className={cn(
-                      "flex flex-col items-center gap-1.5 rounded-xl border-2 p-4 text-sm font-medium transition-all",
-                      channel === ch.value
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-muted-foreground/30",
-                    )}
-                  >
-                    <Icon className="size-5" weight="duotone" />
-                    <span>{ch.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {channel === "MOBILE_MONEY" && (
-            <div className="space-y-1.5">
-              <Label htmlFor="momoPhone">Numéro Mobile Money</Label>
-              <Input
-                id="momoPhone"
-                value={momoPhone}
-                onChange={(e) => setMomoPhone(e.target.value)}
-                placeholder="812345678"
-                inputMode="numeric"
-                maxLength={9}
-                className="h-11"
+              <Row label="Montant nominal" value={fmt(settlement.nominal, product.currency)} />
+              <Row
+                label={`Taux annoncé`}
+                value={`${(product.annualRate * 100).toFixed(2)} % l'an`}
               />
-              <p className="text-xs text-muted-foreground">
-                Prérempli depuis votre{" "}
-                <a href="/settlement" className="underline hover:text-foreground">
-                  profil de règlement
-                </a>
-                . EasyPay enverra le prompt USSD sur ce numéro.
-              </p>
-            </div>
-          )}
-
-          {channel === "BANK_TRANSFER" && (
-            <div className="space-y-4">
-              <div className="space-y-1 rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
-                <p className="font-medium text-foreground">
-                  Coordonnées bancaires du Trésor Public
-                </p>
-                <p>
-                  Banque : <strong>Banque Centrale du Congo (BCC)</strong>
-                </p>
-                <p>
-                  Compte : <strong>CD12 3456 7890 1234 5678</strong>
-                </p>
-                <p>
-                  Référence :{" "}
-                  <strong>EKONZO-{Date.now().toString().slice(-8)}</strong>
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="bankName">Votre banque</Label>
-                <Input
-                  id="bankName"
-                  placeholder="Ex : Rawbank, Equity BCDC…"
-                  value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
-                  className="h-11"
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="bankAccount">Votre numéro de compte</Label>
-                <Input
-                  id="bankAccount"
-                  placeholder="Ex : 123456789"
-                  value={bankAccount}
-                  onChange={(e) => setBankAccount(e.target.value)}
-                  className="h-11"
-                  required
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Prérempli depuis votre{" "}
-                <a href="/settlement" className="underline hover:text-foreground">
-                  profil de règlement
-                </a>
-                .
-              </p>
+              {settlement.kind === "BT" ? (
+                <>
+                  <Row
+                    label={`Intérêts précomptés (${settlement.days} j)`}
+                    value={`− ${fmt(settlement.interest, product.currency)}`}
+                  />
+                  <Row
+                    label="À régler via votre banque"
+                    value={fmt(settlement.payable, product.currency)}
+                    strong
+                  />
+                  <Row
+                    label="Remboursé à l'échéance"
+                    value={fmt(settlement.nominal, product.currency)}
+                  />
+                </>
+              ) : (
+                <>
+                  <Row
+                    label="À régler via votre banque (au pair)"
+                    value={fmt(settlement.payable, product.currency)}
+                    strong
+                  />
+                  <Row
+                    label={`Intérêts par période (${settlement.totalInterestPayments} paiements)`}
+                    value={fmt(settlement.interestPerPeriod, product.currency)}
+                  />
+                  <Row
+                    label="Total des intérêts"
+                    value={fmt(settlement.totalInterest, product.currency)}
+                  />
+                  <Row
+                    label={`Principal (${settlement.principalPayments} remboursement${settlement.principalPayments > 1 ? "s" : ""})`}
+                    value={`${fmt(settlement.principalPerPayment, product.currency)} / paiement`}
+                  />
+                </>
+              )}
             </div>
           )}
 
@@ -454,30 +282,41 @@ export function SubscribeForm({
             type="submit"
             className="h-11 w-full"
             size="lg"
-            disabled={
-              loading ||
-              !valid ||
-              amountNum === 0 ||
-              (channel === "MOBILE_MONEY" && !momoPhone.trim()) ||
-              (channel === "BANK_TRANSFER" &&
-                (!bankName.trim() || !bankAccount.trim()))
-            }
+            disabled={loading || !valid}
           >
             {loading
-              ? channel === "MOBILE_MONEY"
-                ? "Envoi du prompt USSD…"
-                : "Traitement en cours…"
-              : channel === "MOBILE_MONEY"
-                ? `Payer ${amountNum > 0 ? amountNum.toLocaleString("fr-CD") : "—"} ${product.currency} par Mobile Money`
-                : `Confirmer la souscription de ${amountNum > 0 ? amountNum.toLocaleString("fr-CD") : "—"} ${product.currency}`}
+              ? "Redirection vers votre banque…"
+              : settlement && valid
+                ? `Payer ${fmt(settlement.payable, product.currency)} via ${bank.shortName}`
+                : "Payer via ma banque"}
           </Button>
 
           <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
             <LockIcon className="size-3.5" />
-            Paiement sécurisé via EasyPay · réglementation BCC
+            Vous serez redirigé vers {bank.shortName} pour confirmer le
+            paiement · ekonzo sera notifié automatiquement
           </p>
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+function Row({
+  label,
+  value,
+  strong,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={cn("text-right", strong ? "font-bold text-primary" : "font-medium")}>
+        {value}
+      </span>
+    </div>
   );
 }

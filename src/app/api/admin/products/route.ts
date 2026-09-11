@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { buildProductCreateData } from "@/modules/products/product.model";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -13,31 +14,48 @@ async function requireAdmin() {
 
 const createSchema = z
   .object({
-    code: z.string().min(2).max(20),
-    type: z.enum(["BT", "OT"]).optional(),
-    currency: z.enum(["CDF", "USD"]),
-    /** @deprecated conservé pour compat DB — égalé au ticket minimum si absent */
-    faceValue: z.number().positive().optional(),
-    minTicket: z.number().positive(),
-    discountRate: z.number().min(0).max(1).optional(),
-    couponRate: z.number().min(0).max(1).optional(),
-    couponFrequency: z
-      .enum(["MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL", "AT_MATURITY"])
-      .optional(),
+    instrumentType: z.enum(["BTI", "BT_USD", "OTI", "OT_USD"]),
+    isin: z.string().min(5).max(20),
+    lineLabel: z.string().min(3).max(120),
+    code: z.string().min(2).max(32).optional(),
+    /** Pourcentage saisi (ex. 9 pour 9 %) — converti en fraction côté API */
+    announcedRatePercent: z.number().min(0).max(100),
+    totalVolume: z.number().positive(),
     issuanceDate: z.string(),
     maturityDate: z.string(),
     adjudicationDate: z.string(),
     subscriptionDeadline: z.string(),
-    totalVolume: z.number().positive(),
+    resultsDate: z.string().optional(),
+    settlementDate: z.string().optional(),
+    interestPeriodsPerYear: z.number().int().min(1).max(12).optional(),
+    principalRepaymentMode: z
+      .enum(["AT_MATURITY", "SEMI_ANNUAL", "ANNUAL"])
+      .optional(),
+    publish: z.boolean().optional(),
   })
-  .refine((d) => d.minTicket <= d.totalVolume, {
-    message: "Le ticket minimum ne peut pas dépasser le montant total annoncé",
-    path: ["minTicket"],
+  .superRefine((d, ctx) => {
+    const isOt = d.instrumentType === "OTI" || d.instrumentType === "OT_USD";
+    if (isOt && !d.interestPeriodsPerYear) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Périodes d'intérêts requises pour une obligation",
+        path: ["interestPeriodsPerYear"],
+      });
+    }
+    if (isOt && !d.principalRepaymentMode) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Modalité de remboursement requise pour une obligation",
+        path: ["principalRepaymentMode"],
+      });
+    }
   });
 
 export async function GET(req: NextRequest) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  if (!session) {
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  }
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
@@ -53,34 +71,53 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  if (!session) {
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  }
 
   const body = createSchema.safeParse(await req.json());
   if (!body.success) {
-    return NextResponse.json({ error: "Données invalides", details: body.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: "Données invalides", details: body.error.flatten() },
+      { status: 400 },
+    );
   }
 
-  const d = body.data;
-  // Modèle grand public : montant libre ≥ ticket mini. faceValue = minTicket (compat schéma).
-  const faceValue = d.faceValue ?? d.minTicket;
-  const product = await prisma.product.create({
-    data: {
-      code: d.code.toUpperCase(),
-      type: d.type ?? "BT",
-      currency: d.currency,
-      faceValue,
-      minTicket: d.minTicket,
-      discountRate: d.discountRate,
-      couponRate: d.couponRate,
-      couponFrequency: d.couponFrequency,
-      issuanceDate: new Date(d.issuanceDate),
-      maturityDate: new Date(d.maturityDate),
-      adjudicationDate: new Date(d.adjudicationDate),
-      subscriptionDeadline: new Date(d.subscriptionDeadline),
-      totalVolume: d.totalVolume,
-      status: "OPEN",
-    },
-  });
+  try {
+    const d = body.data;
+    const isin = d.isin.trim().toUpperCase();
+    const existingIsin = await prisma.product.findFirst({
+      where: { isin },
+    });
+    if (existingIsin) {
+      return NextResponse.json(
+        { error: "Ce code ISIN existe déjà" },
+        { status: 409 },
+      );
+    }
 
-  return NextResponse.json(product, { status: 201 });
+    const data = buildProductCreateData({
+      instrumentType: d.instrumentType,
+      isin,
+      lineLabel: d.lineLabel,
+      code: d.code,
+      announcedRate: d.announcedRatePercent / 100,
+      totalVolume: d.totalVolume,
+      issuanceDate: d.issuanceDate,
+      maturityDate: d.maturityDate,
+      adjudicationDate: d.adjudicationDate,
+      subscriptionDeadline: d.subscriptionDeadline,
+      resultsDate: d.resultsDate,
+      settlementDate: d.settlementDate,
+      interestPeriodsPerYear: d.interestPeriodsPerYear,
+      principalRepaymentMode: d.principalRepaymentMode,
+      publish: d.publish,
+    });
+
+    const product = await prisma.product.create({ data });
+    return NextResponse.json(product, { status: 201 });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Erreur serveur";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }
