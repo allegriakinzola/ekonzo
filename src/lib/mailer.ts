@@ -1,4 +1,6 @@
 import nodemailer from "nodemailer";
+import { buildOtpEmail, type OtpEmailType } from "./email/otp";
+import { renderEmailHtml, type EmailContent } from "./email/layout";
 
 function getTransport() {
   const user = process.env.SMTP_USER;
@@ -36,18 +38,33 @@ export async function sendEmail(opts: {
   });
 }
 
-export async function sendOtpEmail(to: string, code: string) {
+/** Envoie un e-mail déjà composé via le layout ekonzo. */
+export async function sendTemplatedEmail(
+  to: string,
+  subject: string,
+  content: EmailContent,
+) {
   await sendEmail({
     to,
-    subject: "Votre code de vérification ekonzo",
-    text: `Votre code de vérification ekonzo est : ${code}\n\nIl expire dans 5 minutes.\nSi vous n'avez pas demandé ce code, ignorez cet e-mail.`,
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px">
-        <h2 style="color:#17418a;margin:0 0 12px">ekonzo</h2>
-        <p style="color:#323230;margin:0 0 16px">Votre code de vérification :</p>
-        <p style="font-size:28px;font-weight:700;letter-spacing:6px;color:#17418a;margin:0 0 16px">${code}</p>
-        <p style="color:#5a5a58;font-size:13px;margin:0">Il expire dans 5 minutes. Si vous n'avez pas demandé ce code, ignorez cet e-mail.</p>
-      </div>
-    `,
+    subject,
+    text: content.text,
+    html: renderEmailHtml(content),
   });
 }
+
+export async function sendOtpEmail(
+  to: string,
+  code: string,
+  type: OtpEmailType = "email-verification",
+) {
+  const email = buildOtpEmail(code, type);
+  await sendEmail({
+    to,
+    subject: email.subject,
+    text: email.text,
+    html: email.html,
+  });
+}
+
+export { buildOtpEmail, renderEmailHtml };
+export type { EmailContent, OtpEmailType };

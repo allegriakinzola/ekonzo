@@ -73,7 +73,7 @@ export const auth = betterAuth({
       expiresIn: 300,
       sendVerificationOTP: async ({ email, otp, type }) => {
         console.log(`[OTP EMAIL] → ${email} (${type}) : ${otp}`);
-        await sendOtpEmail(email, otp);
+        await sendOtpEmail(email, otp, type);
       },
     }),
 
