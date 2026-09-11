@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatDate } from "@/lib/format";
+import { isUsableLogoUrl } from "@/lib/logo";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { getActiveBankLink } from "@/modules/banks/bank-link.service";
@@ -281,7 +282,7 @@ function BankLogo({
   logoUrl: string | null;
   shortName: string;
 }) {
-  return logoUrl ? (
+  return isUsableLogoUrl(logoUrl) ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={logoUrl}

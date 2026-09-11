@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
+import { isUsableLogoUrl } from "@/lib/logo";
 
 const schema = z
   .object({
@@ -82,7 +83,7 @@ export default function BankSetPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,oklch(0.98_0.01_220)_0%,oklch(0.97_0.005_264)_100%)] px-6 py-12">
       <div className="w-full max-w-sm space-y-6 rounded-xl border bg-card p-8 shadow-sm ring-1 ring-rdc-navy/5">
         <div className="space-y-3 text-center">
-          {info?.logoUrl ? (
+          {isUsableLogoUrl(info?.logoUrl) ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={info.logoUrl}

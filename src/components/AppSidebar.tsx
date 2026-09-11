@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { isUsableLogoUrl } from "@/lib/logo";
 
 export interface SidebarNavItem {
   href: string;
@@ -64,7 +65,7 @@ export function AppSidebar({
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b">
-        {brandLogoSrc ? (
+        {isUsableLogoUrl(brandLogoSrc) ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={brandLogoSrc}

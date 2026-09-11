@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { isUsableLogoUrl } from "@/lib/logo";
 
 type Bank = {
   id: string;
@@ -254,7 +255,7 @@ function BankLogo({
   size?: "md" | "lg";
 }) {
   const cls = size === "lg" ? "size-14" : "size-12";
-  return logoUrl ? (
+  return isUsableLogoUrl(logoUrl) ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={logoUrl}

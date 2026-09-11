@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { isUsableLogoUrl } from "@/lib/logo";
 
 type Method = "BANK_ACCOUNT" | "MOBILE_MONEY";
 type MomoPhase = "idle" | "awaiting" | "failed";
@@ -193,7 +194,7 @@ export function IdpPayForm({
     <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,oklch(0.97_0.02_250)_0%,oklch(0.98_0.01_220)_100%)] px-6 py-12">
       <div className="w-full max-w-md space-y-6 rounded-xl border bg-card p-8 shadow-sm">
         <div className="space-y-3 text-center">
-          {logoUrl ? (
+          {isUsableLogoUrl(logoUrl) ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={logoUrl}

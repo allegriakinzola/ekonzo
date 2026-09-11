@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
+import { isUsableLogoUrl } from "@/lib/logo";
 
 const schema = z.object({
   email: z.string().email("E-mail invalide"),
@@ -62,7 +63,7 @@ export function IdpLoginForm({
     <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,oklch(0.97_0.02_250)_0%,oklch(0.98_0.01_220)_100%)] px-6 py-12">
       <div className="w-full max-w-sm space-y-6 rounded-xl border bg-card p-8 shadow-sm">
         <div className="space-y-3 text-center">
-          {logoUrl ? (
+          {isUsableLogoUrl(logoUrl) ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={logoUrl}

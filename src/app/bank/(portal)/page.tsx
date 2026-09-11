@@ -1,4 +1,5 @@
 import { BuildingIcon } from "@phosphor-icons/react/dist/ssr";
+import { isUsableLogoUrl } from "@/lib/logo";
 import { requireRole } from "@/lib/session";
 import { getBankByUserId } from "@/modules/banks/bank.service";
 
@@ -26,7 +27,7 @@ export default async function BankHomePage() {
             Les modules d&apos;intégration seront branchés ici.
           </p>
         </div>
-        {bank?.logoUrl && (
+        {isUsableLogoUrl(bank?.logoUrl) && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={bank.logoUrl}

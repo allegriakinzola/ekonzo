@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { isUsableLogoUrl } from "@/lib/logo";
 import { computeSettlement } from "@/modules/products/pricing";
 import type { InstrumentType, PrincipalRepaymentMode } from "@prisma/client";
 
@@ -156,7 +157,7 @@ export function SubscribeForm({
       <CardContent className="pt-4">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="flex items-center gap-3 rounded-xl border bg-muted/40 p-3">
-            {bank.logoUrl ? (
+            {isUsableLogoUrl(bank.logoUrl) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={bank.logoUrl}
