@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { InstrumentType } from "@prisma/client";
 import {
   BankIcon,
   CheckCircleIcon,
@@ -28,7 +29,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -42,16 +42,12 @@ import { PageHeader } from "@/components/page-header";
 import { InfoList, InfoRow } from "@/components/info-list";
 import { Avatar, BankLogo, EmptyState, StatCard } from "@/components/data-display";
 import {
-  COMMITTED_STATUSES,
-  DISCARDED_STATUSES,
   InstrumentBadge,
-  SUBSCRIPTION_STATUS_LABELS,
+  PAID_STATUSES,
   SubscriptionStatusBadge,
   paymentChannelLabel,
 } from "@/components/status-badges";
 import { formatAmount, formatDate } from "@/lib/format";
-import { cn } from "@/lib/utils";
-import type { InstrumentType } from "@prisma/client";
 import {
   INSTRUMENT_LABELS,
   INSTRUMENT_SHORT,
@@ -105,14 +101,19 @@ export interface AdminSubscription {
   } | null;
 }
 
+/**
+ * Logique métier : dès que la banque confirme le paiement, la souscription
+ * est validée — elle vaut soumission et adjudication au taux annoncé.
+ * Il n'y a donc que deux états utiles : paiement attendu / payée.
+ */
 const FILTER_TABS = [
   { value: "ALL", label: "Toutes" },
-  { value: "PENDING_PAYMENT", label: "Paiement attendu" },
-  { value: "PAYMENT_CONFIRMED", label: "Payées" },
-  { value: "SUBMITTED", label: "Soumises" },
-  { value: "ADJUDICATED", label: "Adjugées" },
-  { value: "DISCARDED", label: "Abandonnées" },
+  { value: "PENDING", label: "Paiement attendu" },
+  { value: "PAID", label: "Payées · validées" },
 ] as const;
+
+const isPaid = (status: string) =>
+  (PAID_STATUSES as readonly string[]).includes(status);
 
 function paymentMethodLabel(s: AdminSubscription) {
   if (s.paymentSession?.method === "MOBILE_MONEY") return "Mobile Money";
@@ -122,6 +123,14 @@ function paymentMethodLabel(s: AdminSubscription) {
 function maskAccount(acc: string | null | undefined) {
   if (!acc) return "—";
   return acc.length > 4 ? `•••• ${acc.slice(-4)}` : acc;
+}
+
+function resolve(s: AdminSubscription) {
+  return resolveInstrument({
+    instrumentType: s.product.instrumentType as InstrumentType | null,
+    type: s.product.type as "BT" | "OT",
+    currency: s.product.currency as "CDF" | "USD",
+  });
 }
 
 export function SubscriptionsManager({
@@ -135,39 +144,29 @@ export function SubscriptionsManager({
   const [acting, setActing] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<AdminSubscription | null>(null);
-  const [adjForm, setAdjForm] = useState({ amount: "", rate: "" });
-
-  const real = useMemo(
-    () =>
-      initial.filter(
-        (s) => !DISCARDED_STATUSES.includes(s.status as never),
-      ),
-    [initial],
-  );
 
   const stats = useMemo(() => {
-    const pending = real.filter((s) => s.status === "PENDING_PAYMENT").length;
-    const committed = real.filter((s) =>
-      COMMITTED_STATUSES.includes(s.status as never),
-    );
-    const cdf = committed
-      .filter((s) => s.currency === "CDF")
-      .reduce((sum, s) => sum + Number(s.amount), 0);
-    const usd = committed
-      .filter((s) => s.currency === "USD")
-      .reduce((sum, s) => sum + Number(s.amount), 0);
-    return { total: real.length, pending, confirmed: committed.length, cdf, usd };
-  }, [real]);
+    const paid = initial.filter((s) => isPaid(s.status));
+    const pending = initial.filter((s) => s.status === "PENDING_PAYMENT");
+    const sum = (rows: AdminSubscription[], cur: string) =>
+      rows
+        .filter((s) => s.currency === cur)
+        .reduce((acc, s) => acc + Number(s.amount), 0);
+    return {
+      total: initial.length,
+      paid: paid.length,
+      pending: pending.length,
+      paidCdf: sum(paid, "CDF"),
+      paidUsd: sum(paid, "USD"),
+      pendingCdf: sum(pending, "CDF"),
+      pendingUsd: sum(pending, "USD"),
+    };
+  }, [initial]);
 
   const displayed = useMemo(() => {
-    let rows =
-      filter === "ALL"
-        ? real
-        : filter === "DISCARDED"
-          ? initial.filter((s) =>
-              DISCARDED_STATUSES.includes(s.status as never),
-            )
-          : initial.filter((s) => s.status === filter);
+    let rows = initial;
+    if (filter === "PENDING") rows = rows.filter((s) => s.status === "PENDING_PAYMENT");
+    if (filter === "PAID") rows = rows.filter((s) => isPaid(s.status));
     const q = query.trim().toLowerCase();
     if (q) {
       rows = rows.filter((s) =>
@@ -186,15 +185,15 @@ export function SubscriptionsManager({
       );
     }
     return rows;
-  }, [initial, real, filter, query]);
+  }, [initial, filter, query]);
 
-  async function doAction(id: string, action: string, extra?: object) {
+  async function doAction(id: string, action: string) {
     setActing(id);
     setError("");
     const res = await fetch(`/api/admin/subscriptions/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, ...extra }),
+      body: JSON.stringify({ action }),
     });
     setActing(null);
     if (!res.ok) {
@@ -206,24 +205,7 @@ export function SubscriptionsManager({
     router.refresh();
   }
 
-  function openDialog(s: AdminSubscription) {
-    setSelected(s);
-    setError("");
-    setAdjForm({
-      amount: s.amount,
-      rate: s.product.announcedRate
-        ? (Number(s.product.announcedRate) * 100).toFixed(2)
-        : "",
-    });
-  }
-
-  const selectedInstrument = selected
-    ? resolveInstrument({
-        instrumentType: selected.product.instrumentType as InstrumentType | null,
-        type: selected.product.type as "BT" | "OT",
-        currency: selected.product.currency as "CDF" | "USD",
-      })
-    : null;
+  const selectedInstrument = selected ? resolve(selected) : null;
 
   return (
     <div className="space-y-8">
@@ -231,37 +213,38 @@ export function SubscriptionsManager({
         eyebrow="Opérations"
         icon={<ReceiptIcon className="size-4" weight="duotone" />}
         title="Souscriptions"
-        description="Suivi des demandes des investisseurs sur les Bons et Obligations du Trésor. Le règlement est effectué auprès de la banque partenaire de l'investisseur, qui notifie ekonzo."
+        description="Demandes des investisseurs sur les Bons et Obligations du Trésor. Le règlement est effectué auprès de la banque partenaire ; dès confirmation du paiement, la souscription est validée au taux annoncé par le Ministère."
       />
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Souscriptions"
           value={stats.total}
-          sub="Hors tentatives abandonnées"
+          sub="Demandes enregistrées"
           icon={<ReceiptIcon className="size-5" weight="duotone" />}
           accent="text-rdc-navy bg-rdc-navy/10 ring-rdc-navy/15"
         />
         <StatCard
-          label="Paiement attendu"
-          value={stats.pending}
-          sub="En attente de la banque"
-          icon={<ClockIcon className="size-5" weight="duotone" />}
-          accent="text-amber-700 bg-amber-50 ring-amber-100"
-        />
-        <StatCard
-          label="Payées / engagées"
-          value={stats.confirmed}
-          sub="Paiement confirmé et au-delà"
+          label="Payées · validées"
+          value={stats.paid}
+          sub={`${formatAmount(stats.paidCdf, "CDF")} · ${formatAmount(stats.paidUsd, "USD")}`}
           icon={<SealCheckIcon className="size-5" weight="duotone" />}
           accent="text-emerald-700 bg-emerald-50 ring-emerald-100"
         />
         <StatCard
-          label="Volume engagé"
-          value={<span className="text-xl">{formatAmount(stats.cdf, "CDF")}</span>}
-          sub={formatAmount(stats.usd, "USD")}
+          label="Paiement attendu"
+          value={stats.pending}
+          sub={`${formatAmount(stats.pendingCdf, "CDF")} · ${formatAmount(stats.pendingUsd, "USD")}`}
+          icon={<ClockIcon className="size-5" weight="duotone" />}
+          accent="text-amber-700 bg-amber-50 ring-amber-100"
+        />
+        <StatCard
+          label="Taux de règlement"
+          value={
+            stats.total > 0 ? `${Math.round((stats.paid / stats.total) * 100)} %` : "—"
+          }
+          sub="Souscriptions réglées par la banque"
           icon={<BankIcon className="size-5" weight="duotone" />}
-          accent="text-primary bg-primary/10 ring-primary/15"
         />
       </section>
 
@@ -271,8 +254,8 @@ export function SubscriptionsManager({
             <div>
               <CardTitle className="text-base">Dossiers</CardTitle>
               <CardDescription>
-                {displayed.length} dossier{displayed.length > 1 ? "s" : ""}{" "}
-                affiché{displayed.length > 1 ? "s" : ""}
+                {displayed.length} dossier{displayed.length > 1 ? "s" : ""} affiché
+                {displayed.length > 1 ? "s" : ""}
               </CardDescription>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -291,7 +274,7 @@ export function SubscriptionsManager({
                   if (typeof value === "string") setFilter(value);
                 }}
               >
-                <TabsList className="h-9 w-full flex-wrap lg:w-auto">
+                <TabsList className="h-9 w-full lg:w-auto">
                   {FILTER_TABS.map((tab) => (
                     <TabsTrigger
                       key={tab.value}
@@ -333,34 +316,22 @@ export function SubscriptionsManager({
               </TableHeader>
               <TableBody>
                 {displayed.map((s) => {
-                  const instrument = resolveInstrument({
-                    instrumentType: s.product.instrumentType as InstrumentType | null,
-                    type: s.product.type as "BT" | "OT",
-                    currency: s.product.currency as "CDF" | "USD",
-                  });
+                  const instrument = resolve(s);
                   const bank = s.paymentSession?.bank ?? s.user.linkedBank;
                   return (
-                    <TableRow
-                      key={s.id}
-                      className={cn(
-                        DISCARDED_STATUSES.includes(s.status as never) &&
-                          "opacity-60",
-                      )}
-                    >
-                      <TableCell className="px-4 py-3 whitespace-normal">
+                    <TableRow key={s.id}>
+                      <TableCell className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
                           <Avatar name={s.user.name} size="sm" />
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">
-                              {s.user.name}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">
+                            <p className="text-sm font-medium">{s.user.name}</p>
+                            <p className="max-w-[200px] truncate text-xs text-muted-foreground">
                               {s.user.email}
                             </p>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="px-4 py-3 whitespace-normal">
+                      <TableCell className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <InstrumentBadge
                             short={INSTRUMENT_SHORT[instrument]}
@@ -370,7 +341,7 @@ export function SubscriptionsManager({
                             {formatRatePercent(s.product.announcedRate)}
                           </span>
                         </div>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                        <p className="mt-1 max-w-[200px] truncate text-xs text-muted-foreground">
                           {s.product.lineLabel ?? s.product.code}
                         </p>
                       </TableCell>
@@ -384,18 +355,12 @@ export function SubscriptionsManager({
                             ` · réglé ${formatAmount(s.settlementAmount, s.currency)}`}
                         </p>
                       </TableCell>
-                      <TableCell className="px-4 py-3 whitespace-normal">
+                      <TableCell className="px-4 py-3">
                         {bank ? (
                           <div className="flex items-center gap-2">
-                            <BankLogo
-                              logoUrl={bank.logoUrl}
-                              shortName={bank.shortName}
-                              size="sm"
-                            />
+                            <BankLogo logoUrl={bank.logoUrl} shortName={bank.shortName} size="sm" />
                             <div className="leading-tight">
-                              <p className="text-sm font-medium">
-                                {bank.shortName}
-                              </p>
+                              <p className="text-sm font-medium">{bank.shortName}</p>
                               <p className="text-[11px] text-muted-foreground">
                                 {paymentMethodLabel(s)}
                               </p>
@@ -417,7 +382,10 @@ export function SubscriptionsManager({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => openDialog(s)}
+                          onClick={() => {
+                            setSelected(s);
+                            setError("");
+                          }}
                         >
                           Détails
                         </Button>
@@ -449,9 +417,7 @@ export function SubscriptionsManager({
                     </DialogTitle>
                     <DialogDescription className="truncate">
                       {selected.user.email}
-                      {selected.user.phoneNumber
-                        ? ` · ${selected.user.phoneNumber}`
-                        : ""}
+                      {selected.user.phoneNumber ? ` · ${selected.user.phoneNumber}` : ""}
                     </DialogDescription>
                   </div>
                 </div>
@@ -473,19 +439,12 @@ export function SubscriptionsManager({
                     Émission
                   </h3>
                   <InfoList>
-                    <InfoRow
-                      label="Instrument"
-                      value={INSTRUMENT_LABELS[selectedInstrument]}
-                    />
+                    <InfoRow label="Instrument" value={INSTRUMENT_LABELS[selectedInstrument]} />
                     <InfoRow
                       label="Ligne"
                       value={selected.product.lineLabel ?? selected.product.code}
                     />
-                    <InfoRow
-                      label="ISIN"
-                      value={selected.product.isin ?? "—"}
-                      mono
-                    />
+                    <InfoRow label="ISIN" value={selected.product.isin ?? "—"} mono />
                     <InfoRow
                       label="Taux annoncé"
                       value={
@@ -494,10 +453,7 @@ export function SubscriptionsManager({
                         </span>
                       }
                     />
-                    <InfoRow
-                      label="Échéance"
-                      value={formatDate(selected.product.maturityDate)}
-                    />
+                    <InfoRow label="Échéance" value={formatDate(selected.product.maturityDate)} />
                   </InfoList>
                 </section>
 
@@ -518,19 +474,10 @@ export function SubscriptionsManager({
                       label="Montant réglé"
                       value={
                         selected.settlementAmount
-                          ? formatAmount(
-                              selected.settlementAmount,
-                              selected.currency,
-                            )
+                          ? formatAmount(selected.settlementAmount, selected.currency)
                           : "—"
                       }
                     />
-                    {selected.adjudicatedAmount && (
-                      <InfoRow
-                        label="Adjugé"
-                        value={`${formatAmount(selected.adjudicatedAmount, selected.currency)} à ${formatRatePercent(selected.adjudicatedRate)}${selected.adjudicatedAt ? ` · ${formatDate(selected.adjudicatedAt)}` : ""}`}
-                      />
-                    )}
                   </InfoList>
                 </section>
 
@@ -569,8 +516,7 @@ export function SubscriptionsManager({
                             PAID: "Payé",
                             FAILED: "Échoué",
                             EXPIRED: "Expiré",
-                          }[selected.paymentSession.status] ??
-                          selected.paymentSession.status
+                          }[selected.paymentSession.status] ?? selected.paymentSession.status
                         }
                       />
                       <InfoRow
@@ -582,11 +528,7 @@ export function SubscriptionsManager({
                         }
                         muted={!selected.paymentSession.paidAt}
                       />
-                      <InfoRow
-                        label="Réf. ekonzo"
-                        value={selected.paymentRef ?? "—"}
-                        mono
-                      />
+                      <InfoRow label="Réf. ekonzo" value={selected.paymentRef ?? "—"} mono />
                       <InfoRow
                         label="Réf. banque"
                         value={selected.paymentSession.notifyRef ?? "—"}
@@ -596,10 +538,7 @@ export function SubscriptionsManager({
                     </InfoList>
                   ) : (
                     <InfoList>
-                      <InfoRow
-                        label="Canal"
-                        value={paymentChannelLabel(selected.paymentChannel)}
-                      />
+                      <InfoRow label="Canal" value={paymentChannelLabel(selected.paymentChannel)} />
                       <InfoRow
                         label="Banque"
                         value={
@@ -621,136 +560,49 @@ export function SubscriptionsManager({
                   </p>
                 )}
 
-                <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Actions
-                  </p>
-
-                  {selected.status === "PENDING_PAYMENT" && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">
-                        Le paiement est normalement confirmé automatiquement par
-                        la notification de la banque. Utilisez cette action
-                        uniquement si la banque a confirmé le règlement hors
-                        ligne.
-                      </p>
+                {selected.status === "PENDING_PAYMENT" ? (
+                  <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                      Paiement attendu
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      La souscription sera validée automatiquement à la notification de la
+                      banque. Si la banque confirme le règlement hors ligne, vous pouvez la
+                      valider manuellement. L&apos;annulation retire la demande non réglée.
+                    </p>
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <Button
-                        className="w-full"
+                        className="flex-1"
                         disabled={acting === selected.id}
-                        onClick={() =>
-                          doAction(selected.id, "confirm_payment")
-                        }
+                        onClick={() => doAction(selected.id, "confirm_payment")}
                       >
                         <CheckCircleIcon weight="bold" />
-                        {acting === selected.id
-                          ? "…"
-                          : "Confirmer le paiement manuellement"}
+                        {acting === selected.id ? "…" : "Valider (paiement reçu)"}
                       </Button>
-                    </div>
-                  )}
-
-                  {selected.status === "PAYMENT_CONFIRMED" && (
-                    <Button
-                      className="w-full bg-rdc-navy text-white hover:bg-rdc-navy/90"
-                      disabled={acting === selected.id}
-                      onClick={() => doAction(selected.id, "submit")}
-                    >
-                      {acting === selected.id
-                        ? "…"
-                        : "Marquer comme soumis à la BCC"}
-                    </Button>
-                  )}
-
-                  {selected.status === "SUBMITTED" && (
-                    <div className="space-y-3">
-                      <p className="text-xs text-muted-foreground">
-                        Renseignez le résultat communiqué par la BCC. Le taux est
-                        pré-rempli avec le taux annoncé par le Ministère.
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="adj-amount">
-                            Montant adjugé ({selected.currency})
-                          </Label>
-                          <Input
-                            id="adj-amount"
-                            type="number"
-                            placeholder={selected.amount}
-                            value={adjForm.amount}
-                            onChange={(e) =>
-                              setAdjForm((f) => ({
-                                ...f,
-                                amount: e.target.value,
-                              }))
-                            }
-                            className="h-9"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="adj-rate">Taux retenu (%)</Label>
-                          <Input
-                            id="adj-rate"
-                            type="number"
-                            step="0.01"
-                            placeholder="12.50"
-                            value={adjForm.rate}
-                            onChange={(e) =>
-                              setAdjForm((f) => ({
-                                ...f,
-                                rate: e.target.value,
-                              }))
-                            }
-                            className="h-9"
-                          />
-                        </div>
-                      </div>
                       <Button
-                        className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
-                        disabled={
-                          acting === selected.id ||
-                          !adjForm.amount ||
-                          !adjForm.rate
-                        }
-                        onClick={() =>
-                          doAction(selected.id, "adjudicate", {
-                            adjudicatedAmount: parseFloat(adjForm.amount),
-                            adjudicatedRate: parseFloat(adjForm.rate) / 100,
-                          })
-                        }
+                        variant="outline"
+                        className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/10"
+                        disabled={acting === selected.id}
+                        onClick={() => doAction(selected.id, "cancel")}
                       >
-                        <SealCheckIcon weight="bold" />
-                        {acting === selected.id ? "…" : "Enregistrer l'adjudication"}
+                        {acting === selected.id ? "…" : "Annuler la demande"}
                       </Button>
                     </div>
-                  )}
-
-                  {["PENDING_PAYMENT", "PAYMENT_CONFIRMED", "SUBMITTED"].includes(
-                    selected.status,
-                  ) && (
-                    <Button
-                      variant="outline"
-                      className="w-full border-destructive/30 text-destructive hover:bg-destructive/10"
-                      disabled={acting === selected.id}
-                      onClick={() => doAction(selected.id, "cancel")}
-                    >
-                      {acting === selected.id
-                        ? "…"
-                        : "Annuler la souscription"}
-                    </Button>
-                  )}
-
-                  {!["PENDING_PAYMENT", "PAYMENT_CONFIRMED", "SUBMITTED"].includes(
-                    selected.status,
-                  ) && (
-                    <p className="text-xs text-muted-foreground">
-                      Aucune action disponible pour le statut «{" "}
-                      {SUBSCRIPTION_STATUS_LABELS[
-                        selected.status as keyof typeof SUBSCRIPTION_STATUS_LABELS
-                      ] ?? selected.status}{" "}
-                      ».
-                    </p>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+                    <SealCheckIcon className="mt-0.5 size-5 shrink-0 text-emerald-700" weight="duotone" />
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-800">
+                        Souscription validée
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Le paiement a été confirmé par la banque : la souscription est soumise
+                        et servie au taux annoncé par le Ministère. Aucune action requise.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}

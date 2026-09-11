@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import {
   ChartBarIcon,
   ClockIcon,
+  CurrencyCircleDollarIcon,
   PlusIcon,
   StackIcon,
 } from "@phosphor-icons/react";
+
+import { EmissionFillChart, KindDonutChart } from "../components/AdminCharts";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -78,6 +81,10 @@ interface Product {
   settlementDate: string | null;
   totalVolume: string;
   allocatedVolume: string;
+  /** Montant payé (validé) par les investisseurs */
+  paidVolume: number;
+  /** Montant en attente de règlement bancaire */
+  pendingVolume: number;
   status: string;
   createdAt: string;
   _count: { subscriptions: number };
@@ -197,6 +204,36 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
   const otCount = rows.length - btCount;
   const totalSubs = rows.reduce((sum, p) => sum + p._count.subscriptions, 0);
 
+  const published = useMemo(
+    () => rows.filter((p) => p.status !== "DRAFT"),
+    [rows],
+  );
+  const byCurrency = useMemo(
+    () =>
+      (["CDF", "USD"] as const)
+        .map((currency) => {
+          const list = published.filter((p) => p.currency === currency);
+          return {
+            currency,
+            announced: list.reduce((s, p) => s + Number(p.totalVolume), 0),
+            paid: list.reduce((s, p) => s + p.paidVolume, 0),
+            pending: list.reduce((s, p) => s + p.pendingVolume, 0),
+            chart: list.map((p) => ({
+              name: p.lineLabel ?? p.code,
+              announced: Number(p.totalVolume),
+              paid: p.paidVolume,
+              pending: p.pendingVolume,
+            })),
+          };
+        })
+        .filter((c) => c.chart.length > 0),
+    [published],
+  );
+  const btPaidVolumeCount = rows
+    .filter((p) => p.type === "BT")
+    .reduce((s, p) => s + p._count.subscriptions, 0);
+  const otPaidVolumeCount = totalSubs - btPaidVolumeCount;
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -218,7 +255,7 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
         }
       />
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Émissions ouvertes"
           value={openCount}
@@ -236,10 +273,94 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
         <StatCard
           label="Souscriptions"
           value={totalSubs}
-          sub="Toutes émissions, hors abandonnées"
+          sub="Toutes émissions publiées"
           icon={<ChartBarIcon className="size-5" weight="duotone" />}
         />
+        <StatCard
+          label="Montant payé"
+          value={
+            <span className="text-lg leading-tight">
+              {byCurrency.map((c) => (
+                <span key={c.currency} className="block">
+                  {formatAmount(c.paid, c.currency)}
+                </span>
+              ))}
+              {byCurrency.length === 0 && "—"}
+            </span>
+          }
+          sub="Validé par les banques partenaires"
+          icon={<CurrencyCircleDollarIcon className="size-5" weight="duotone" />}
+          accent="text-amber-700 bg-amber-50 ring-amber-100"
+        />
       </section>
+
+      {published.length > 0 && (
+        <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <Card className="ring-1 ring-rdc-navy/5 xl:col-span-2">
+            <CardHeader className="border-b [.border-b]:pb-4">
+              <CardTitle className="text-base">Couverture des émissions</CardTitle>
+              <CardDescription>
+                Pour chaque émission publiée : montant annoncé, montant payé par les
+                investisseurs et paiements attendus
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-5">
+              {byCurrency.map((c) => {
+                const pct =
+                  c.announced > 0
+                    ? Math.min(100, Math.round((c.paid / c.announced) * 100))
+                    : 0;
+                return (
+                  <div key={c.currency}>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs font-semibold text-rdc-navy">
+                        {c.currency === "CDF"
+                          ? "Instruments indexés (CDF)"
+                          : "Instruments en USD"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatAmount(c.paid, c.currency)} payés · {pct}% de{" "}
+                        {formatAmount(c.announced, c.currency)}
+                      </p>
+                    </div>
+                    <EmissionFillChart data={c.chart} currency={c.currency} />
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          <Card className="ring-1 ring-rdc-navy/5">
+            <CardHeader className="border-b [.border-b]:pb-4">
+              <CardTitle className="text-base">Bons vs Obligations</CardTitle>
+              <CardDescription>Souscriptions par famille de titres</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-5">
+              <KindDonutChart bt={btPaidVolumeCount} ot={otPaidVolumeCount} />
+              <ul className="mt-4 divide-y divide-border/70 text-sm">
+                {byCurrency.map((c) => (
+                  <li key={c.currency} className="py-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{c.currency}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {c.chart.length} émission{c.chart.length > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Payé {formatAmount(c.paid, c.currency)}</span>
+                      {c.pending > 0 && (
+                        <span className="text-amber-700">
+                          Attendu {formatAmount(c.pending, c.currency)}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       <Card className="border-border/80 bg-card shadow-sm ring-1 ring-rdc-navy/5">
         <CardHeader className="border-b [.border-b]:pb-4">
@@ -277,7 +398,7 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
                   <TableHead className="px-4">Montant annoncé</TableHead>
                   <TableHead className="px-4">Taux annoncé</TableHead>
                   <TableHead className="px-4">Clôture</TableHead>
-                  <TableHead className="px-4 text-right">Souscr.</TableHead>
+                  <TableHead className="px-4">Couverture</TableHead>
                   <TableHead className="px-4">Statut</TableHead>
                   <TableHead className="px-4 text-right">Action</TableHead>
                 </TableRow>
@@ -293,19 +414,24 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
                     p.announcedRate ?? p.discountRate ?? p.couponRate;
                   const next = STATUS_TRANSITIONS[p.status]?.[0];
                   const days = daysUntil(p.subscriptionDeadline);
+                  const total = Number(p.totalVolume);
+                  const pct =
+                    total > 0
+                      ? Math.min(100, Math.round((p.paidVolume / total) * 100))
+                      : 0;
                   return (
                     <TableRow
                       key={p.id}
                       className="cursor-pointer"
                       onClick={() => router.push(`/admin/products/${p.id}`)}
                     >
-                      <TableCell className="px-4 py-3 whitespace-normal">
+                      <TableCell className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <InstrumentBadge
                             short={INSTRUMENT_SHORT[instrument]}
                             isObligation={isObligation(instrument)}
                           />
-                          <p className="truncate text-sm font-semibold text-rdc-navy">
+                          <p className="max-w-[220px] truncate text-sm font-semibold text-rdc-navy">
                             {p.lineLabel ?? p.code}
                           </p>
                         </div>
@@ -313,7 +439,7 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
                           {p.isin ?? p.code}
                         </p>
                       </TableCell>
-                      <TableCell className="px-4 py-3 whitespace-normal">
+                      <TableCell className="px-4 py-3">
                         <p className="font-medium">
                           {formatAmount(p.totalVolume, p.currency)}
                         </p>
@@ -325,7 +451,7 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
                       <TableCell className="px-4 py-3 text-base font-bold text-primary">
                         {formatRatePercent(rate)}
                       </TableCell>
-                      <TableCell className="px-4 py-3 whitespace-normal">
+                      <TableCell className="px-4 py-3">
                         <p className="text-sm">{formatDate(p.subscriptionDeadline)}</p>
                         {p.status === "OPEN" && (
                           <p
@@ -344,17 +470,24 @@ export function ProductsManager({ initial }: { initial: Product[] }) {
                           </p>
                         )}
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-right">
-                        <span
-                          className={cn(
-                            "text-sm font-semibold tabular-nums",
-                            p._count.subscriptions > 0
-                              ? "text-primary"
-                              : "text-muted-foreground",
-                          )}
-                        >
-                          {p._count.subscriptions}
-                        </span>
+                      <TableCell className="px-4 py-3">
+                        <div className="w-36">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-semibold text-rdc-navy">{pct}%</span>
+                            <span className="text-muted-foreground">
+                              {p._count.subscriptions} souscr.
+                            </span>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full rounded-full bg-primary"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                            {formatAmount(p.paidVolume, p.currency)} payés
+                          </p>
+                        </div>
                       </TableCell>
                       <TableCell className="px-4 py-3">
                         <ProductStatusBadge status={p.status} />

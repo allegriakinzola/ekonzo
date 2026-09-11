@@ -3,17 +3,31 @@ import type { PaymentChannel, SubscriptionStatus } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
+/**
+ * Logique métier : une souscription payée par la banque est validée
+ * (elle vaut soumission et adjudication au taux annoncé par le Ministère).
+ * Les anciens statuts intermédiaires sont donc tous affichés « Validée ».
+ */
 export const SUBSCRIPTION_STATUS_LABELS: Record<SubscriptionStatus, string> = {
   PENDING_PAYMENT: "Paiement attendu",
-  PAYMENT_CONFIRMED: "Paiement confirmé",
-  SUBMITTED: "Soumis à la BCC",
-  ADJUDICATED: "Adjugé",
-  PARTIALLY_ADJUDICATED: "Partiellement adjugé",
-  ACTIVE: "Actif",
-  REIMBURSED: "Remboursé",
-  CANCELLED: "Annulé",
-  FAILED: "Échoué",
+  PAYMENT_CONFIRMED: "Payée · validée",
+  SUBMITTED: "Validée",
+  ADJUDICATED: "Validée",
+  PARTIALLY_ADJUDICATED: "Validée",
+  ACTIVE: "Titres actifs",
+  REIMBURSED: "Remboursée",
+  CANCELLED: "Annulée",
+  FAILED: "Échouée",
 };
+
+/** Statuts « payée = validée ». */
+export const PAID_STATUSES: SubscriptionStatus[] = [
+  "PAYMENT_CONFIRMED",
+  "SUBMITTED",
+  "ADJUDICATED",
+  "PARTIALLY_ADJUDICATED",
+  "ACTIVE",
+];
 
 export const PRODUCT_STATUS_LABELS: Record<string, string> = {
   DRAFT: "Brouillon",
@@ -51,15 +65,14 @@ export function paymentChannelLabel(channel: PaymentChannel | string | null) {
 
 export function subscriptionStatusClass(status: string) {
   switch (status) {
-    case "ADJUDICATED":
-    case "ACTIVE":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
     case "PAYMENT_CONFIRMED":
-      return "border-primary/20 bg-primary/10 text-primary";
     case "SUBMITTED":
+    case "ADJUDICATED":
+    case "PARTIALLY_ADJUDICATED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "ACTIVE":
       return "border-rdc-navy/20 bg-rdc-navy/10 text-rdc-navy";
     case "PENDING_PAYMENT":
-    case "PARTIALLY_ADJUDICATED":
       return "border-amber-200 bg-amber-50 text-amber-800";
     case "CANCELLED":
     case "FAILED":

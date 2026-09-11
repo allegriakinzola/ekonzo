@@ -42,7 +42,7 @@ export function ProductDetailActions({
     CLOSED:
       "La période de souscription est terminée. Les banques transmettent les soumissions à la BCC.",
     ADJUDICATED:
-      "Résultats de l'adjudication BCC reçus. Enregistrez les montants retenus dossier par dossier depuis les souscriptions.",
+      "Adjudication BCC effectuée. Les souscriptions payées sont servies au taux annoncé par le Ministère.",
     ACTIVE:
       "Les titres sont émis — les investisseurs détiennent leurs Bons / Obligations.",
     MATURED:

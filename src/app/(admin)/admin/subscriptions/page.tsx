@@ -5,7 +5,9 @@ import { SubscriptionsManager } from "./SubscriptionsManager";
 export default async function AdminSubscriptionsPage() {
   await requireRole(["ADMIN", "SUPER_ADMIN"]);
 
+  // Les tentatives échouées / annulées ne sont pas des souscriptions.
   const subs = await prisma.subscription.findMany({
+    where: { status: { notIn: ["FAILED", "CANCELLED"] } },
     orderBy: { createdAt: "desc" },
     include: {
       user: {
