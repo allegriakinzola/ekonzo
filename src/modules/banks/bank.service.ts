@@ -1,17 +1,8 @@
 import { createHash, randomBytes } from "crypto";
 import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { sendEmail } from "@/lib/mailer";
 
-const INVITE_TTL_MS = 1000 * 60 * 60 * 48; // 48h
 const MAX_LOGO_BYTES = 512 * 1024; // 512 Ko
-
-function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(
-    /\/$/,
-    "",
-  );
-}
 
 function slugCode(raw: string) {
   return raw
@@ -92,13 +83,18 @@ export async function createPartnerBank(input: {
   shortName: string;
   code: string;
   email: string;
+  password: string;
   logoFile?: File | null;
 }) {
   const email = input.email.trim().toLowerCase();
   const code = slugCode(input.code || input.shortName);
+  const password = input.password;
 
   if (!code) throw new Error("Code banque invalide");
   if (!email.includes("@")) throw new Error("E-mail invalide");
+  if (password.length < 8) {
+    throw new Error("Mot de passe : 8 caractères minimum");
+  }
 
   const existing = await prisma.partnerBank.findFirst({
     where: { OR: [{ email }, { code }] },
@@ -107,6 +103,9 @@ export async function createPartnerBank(input: {
 
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) throw new Error("Cet e-mail est déjà utilisé par un compte");
+
+  const hashed = await hash(password, 12);
+  const now = new Date();
 
   const user = await prisma.user.create({
     data: {
@@ -117,13 +116,12 @@ export async function createPartnerBank(input: {
     },
   });
 
-  // Compte credential sans mot de passe — défini via l'invitation
   await prisma.account.create({
     data: {
       userId: user.id,
       accountId: email,
       providerId: "credential",
-      password: null,
+      password: hashed,
     },
   });
 
@@ -134,22 +132,20 @@ export async function createPartnerBank(input: {
       code,
       email,
       userId: user.id,
-      invitedAt: new Date(),
+      isActive: true,
+      activatedAt: now,
       oauthClientSecret: randomBytes(32).toString("hex"),
       interopMode: "SIMULATED",
     },
   });
 
-  let logoUrl: string | null = null;
   if (input.logoFile && input.logoFile.size > 0) {
-    logoUrl = await saveBankLogo(input.logoFile, bank.id);
+    const logoUrl = await saveBankLogo(input.logoFile, bank.id);
     await prisma.partnerBank.update({
       where: { id: bank.id },
       data: { logoUrl },
     });
   }
-
-  await sendBankInvite(bank.id);
 
   return prisma.partnerBank.findUniqueOrThrow({
     where: { id: bank.id },
@@ -157,55 +153,7 @@ export async function createPartnerBank(input: {
   });
 }
 
-export async function sendBankInvite(bankId: string) {
-  const bank = await prisma.partnerBank.findUnique({ where: { id: bankId } });
-  if (!bank) throw new Error("Banque introuvable");
-
-  const raw = randomBytes(32).toString("hex");
-  const tokenHash = createHash("sha256").update(raw).digest("hex");
-
-  await prisma.bankInviteToken.updateMany({
-    where: { bankId, usedAt: null },
-    data: { usedAt: new Date() },
-  });
-
-  await prisma.bankInviteToken.create({
-    data: {
-      bankId,
-      token: tokenHash,
-      expiresAt: new Date(Date.now() + INVITE_TTL_MS),
-    },
-  });
-
-  await prisma.partnerBank.update({
-    where: { id: bankId },
-    data: { invitedAt: new Date() },
-  });
-
-  const link = `${appUrl()}/bank/set-password?token=${raw}`;
-
-  await sendEmail({
-    to: bank.email,
-    subject: `Invitation ekonzo — activez l'espace ${bank.shortName}`,
-    text: `Bonjour,\n\nLe Ministère des Finances vous invite à activer l'espace banque « ${bank.name} » sur ekonzo.\n\nIdentifiant de connexion : ${bank.email}\n\nDéfinissez votre mot de passe via ce lien (valable 48 h) :\n${link}\n\nCordialement,\nekonzo`,
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px">
-        <h2 style="color:#17418a;margin:0 0 12px">ekonzo</h2>
-        <p>Le Ministère des Finances vous invite à activer l'espace banque <strong>${bank.name}</strong>.</p>
-        <p>Identifiant de connexion : <strong>${bank.email}</strong></p>
-        <p style="margin:24px 0">
-          <a href="${link}" style="background:#17418a;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;display:inline-block">
-            Définir mon mot de passe
-          </a>
-        </p>
-        <p style="color:#5a5a58;font-size:13px">Ce lien expire dans 48 heures.</p>
-      </div>
-    `,
-  });
-
-  return { email: bank.email, link };
-}
-
+/** Conservé pour les liens d'invitation déjà envoyés avant la création directe. */
 export async function activateBankPassword(rawToken: string, password: string) {
   if (password.length < 8) throw new Error("Mot de passe : 8 caractères minimum");
 

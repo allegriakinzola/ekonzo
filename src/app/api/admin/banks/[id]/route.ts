@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { sendBankInvite, saveBankLogo } from "@/modules/banks/bank.service";
+import { saveBankLogo } from "@/modules/banks/bank.service";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -65,13 +65,7 @@ export async function PATCH(
       name?: string;
       shortName?: string;
       isActive?: boolean;
-      resendInvite?: boolean;
     };
-
-    if (body.resendInvite) {
-      await sendBankInvite(id);
-      return NextResponse.json({ ok: true });
-    }
 
     const updated = await prisma.partnerBank.update({
       where: { id },

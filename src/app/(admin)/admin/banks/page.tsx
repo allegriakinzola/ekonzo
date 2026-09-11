@@ -23,7 +23,6 @@ export default async function AdminBanksPage() {
     logoUrl: b.logoUrl,
     isActive: b.isActive,
     interopMode: b.interopMode,
-    invitedAt: b.invitedAt?.toISOString() ?? null,
     activatedAt: b.activatedAt?.toISOString() ?? null,
     createdAt: b.createdAt.toISOString(),
     linkedClients: b._count.links,
@@ -40,7 +39,7 @@ export default async function AdminBanksPage() {
         eyebrow="Partenaires"
         icon={<BuildingsIcon className="size-4" weight="duotone" />}
         title="Banques partenaires"
-        description="Banques commerciales agréées : elles authentifient les investisseurs, règlent les souscriptions (compte bancaire ou Mobile Money) et notifient ekonzo. Créez le compte, envoyez l'invitation et gérez le logo affiché."
+        description="Banques commerciales agréées : elles authentifient les investisseurs, règlent les souscriptions (compte bancaire ou Mobile Money) et notifient ekonzo. Créez le compte avec e-mail et mot de passe, puis gérez le logo affiché."
       />
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">

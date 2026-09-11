@@ -35,11 +35,19 @@ export async function POST(req: NextRequest) {
     const shortName = String(form.get("shortName") ?? "").trim();
     const code = String(form.get("code") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
     const logo = form.get("logo");
 
-    if (!name || !shortName || !email) {
+    if (!name || !shortName || !email || !password) {
       return NextResponse.json(
-        { error: "Nom, sigle et e-mail sont requis" },
+        { error: "Nom, sigle, e-mail et mot de passe sont requis" },
+        { status: 400 },
+      );
+    }
+
+    if (password.length < 8) {
+      return NextResponse.json(
+        { error: "Mot de passe : 8 caractères minimum" },
         { status: 400 },
       );
     }
@@ -59,6 +67,7 @@ export async function POST(req: NextRequest) {
       shortName,
       code: code || shortName,
       email,
+      password,
       logoFile,
     });
 

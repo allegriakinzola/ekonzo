@@ -27,7 +27,6 @@ export type BankRow = {
   logoUrl: string | null;
   isActive: boolean;
   interopMode: string;
-  invitedAt: string | null;
   activatedAt: string | null;
   createdAt: string;
   linkedClients: number;
@@ -60,6 +59,7 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
   const [shortName, setShortName] = useState("");
   const [code, setCode] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [logo, setLogo] = useState<File | null>(null);
 
   const hasBrokenLogos = banks.some((b) => isBrokenLogo(b.logoUrl));
@@ -69,6 +69,7 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
     setShortName("");
     setCode("");
     setEmail("");
+    setPassword("");
     setLogo(null);
     setError("");
   }
@@ -78,11 +79,16 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
     setLoading(true);
     setError("");
     try {
+      if (password.length < 8) {
+        throw new Error("Mot de passe : 8 caractères minimum");
+      }
+
       const form = new FormData();
       form.set("name", name);
       form.set("shortName", shortName);
       form.set("code", code || shortName);
       form.set("email", email);
+      form.set("password", password);
       if (logo) form.set("logo", logo);
 
       const res = await fetch("/api/admin/banks", { method: "POST", body: form });
@@ -105,25 +111,6 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
       setError(err instanceof Error ? err.message : "Erreur");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function resendInvite(id: string) {
-    setActionId(id);
-    try {
-      const res = await fetch(`/api/admin/banks/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resendInvite: true }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Envoi impossible");
-      alert("Invitation renvoyée par e-mail.");
-      router.refresh();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur");
-    } finally {
-      setActionId(null);
     }
   }
 
@@ -208,8 +195,8 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
             Nouvelle banque partenaire
           </h2>
           <p className="text-sm text-muted-foreground">
-            Un compte BANK sera créé et une invitation sera envoyée pour définir
-            le mot de passe.
+            Le compte BANK est créé immédiatement avec l&apos;e-mail et le mot
+            de passe fournis — aucun e-mail d&apos;invitation n&apos;est envoyé.
           </p>
           {error && (
             <Alert variant="destructive" className="text-sm">
@@ -246,7 +233,7 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
                 placeholder="BCDC"
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-2">
               <Label htmlFor="email">Identifiant de connexion (e-mail)</Label>
               <Input
                 id="email"
@@ -255,6 +242,19 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="tresorerie@banque.cd"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Mot de passe</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                placeholder="8 caractères minimum"
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
@@ -272,7 +272,7 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
             </div>
           </div>
           <Button type="submit" disabled={loading}>
-            {loading ? "Création…" : "Créer et envoyer l'invitation"}
+            {loading ? "Création…" : "Créer la banque"}
           </Button>
         </form>
       )}
@@ -286,7 +286,7 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
               <TableHead className="px-4 text-right">Clients liés</TableHead>
               <TableHead className="px-4 text-right">Paiements</TableHead>
               <TableHead className="px-4">Statut</TableHead>
-              <TableHead className="px-4">Invitation</TableHead>
+              <TableHead className="px-4">Créée le</TableHead>
               <TableHead className="px-4 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -362,9 +362,7 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
                   )}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {bank.invitedAt
-                    ? formatDate(new Date(bank.invitedAt))
-                    : "—"}
+                  {formatDate(new Date(bank.createdAt))}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
@@ -392,15 +390,6 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
                       {isBrokenLogo(bank.logoUrl) || !bank.logoUrl
                         ? "Charger le logo"
                         : "Changer le logo"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={actionId === bank.id}
-                      onClick={() => resendInvite(bank.id)}
-                    >
-                      Renvoyer l&apos;invitation
                     </Button>
                     <Button
                       type="button"
