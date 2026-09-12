@@ -26,7 +26,6 @@ export type BankRow = {
   email: string;
   logoUrl: string | null;
   isActive: boolean;
-  interopMode: string;
   activatedAt: string | null;
   createdAt: string;
   linkedClients: number;
@@ -61,6 +60,15 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [logo, setLogo] = useState<File | null>(null);
+  const [authorizeUrl, setAuthorizeUrl] = useState(
+    "http://localhost:3001/oauth/authorize",
+  );
+  const [tokenUrl, setTokenUrl] = useState(
+    "http://localhost:3001/api/oauth/token",
+  );
+  const [userinfoUrl, setUserinfoUrl] = useState(
+    "http://localhost:3001/api/oauth/userinfo",
+  );
 
   const hasBrokenLogos = banks.some((b) => isBrokenLogo(b.logoUrl));
 
@@ -89,6 +97,9 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
       form.set("code", code || shortName);
       form.set("email", email);
       form.set("password", password);
+      form.set("authorizeUrl", authorizeUrl);
+      form.set("tokenUrl", tokenUrl);
+      form.set("userinfoUrl", userinfoUrl);
       if (logo) form.set("logo", logo);
 
       const res = await fetch("/api/admin/banks", { method: "POST", body: form });
@@ -98,7 +109,6 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
       setBanks((prev) => [
         {
           ...data,
-          interopMode: data.interopMode ?? "SIMULATED",
           linkedClients: 0,
           paidPayments: 0,
         },
@@ -257,6 +267,45 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
                 placeholder="8 caractères minimum"
               />
             </div>
+            <div className="space-y-2 sm:col-span-2 rounded-lg border border-dashed border-rdc-navy/20 bg-muted/30 p-3">
+              <p className="text-xs font-semibold text-rdc-navy">
+                Intégration API (portail de la banque)
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Indiquez les URLs OAuth du portail bancaire. Les clés{" "}
+                <code className="text-[10px]">client_id</code> /{" "}
+                <code className="text-[10px]">client_secret</code> sont générées
+                automatiquement à la création (visibles ensuite dans l&apos;espace
+                banque).
+              </p>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="authorizeUrl">URL authorize</Label>
+              <Input
+                id="authorizeUrl"
+                value={authorizeUrl}
+                onChange={(e) => setAuthorizeUrl(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tokenUrl">URL token</Label>
+              <Input
+                id="tokenUrl"
+                value={tokenUrl}
+                onChange={(e) => setTokenUrl(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="userinfoUrl">URL userinfo</Label>
+              <Input
+                id="userinfoUrl"
+                value={userinfoUrl}
+                onChange={(e) => setUserinfoUrl(e.target.value)}
+                required
+              />
+            </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="logo">Logo de la banque</Label>
               <Input
@@ -320,10 +369,7 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
                     <div>
                       <p className="font-medium leading-tight">{bank.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {bank.shortName} · {bank.code} ·{" "}
-                        {bank.interopMode === "EXTERNAL"
-                          ? "Interop. externe"
-                          : "Interop. simulée"}
+                        {bank.shortName} · {bank.code}
                       </p>
                       {isBrokenLogo(bank.logoUrl) && (
                         <p className="text-[11px] font-medium text-amber-700">

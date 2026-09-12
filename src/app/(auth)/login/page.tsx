@@ -43,7 +43,7 @@ export default function LoginPage() {
       } else if (role === "BANK") {
         router.push("/bank");
       } else {
-        router.push("/dashboard");
+        router.push("/profile/bank");
       }
     } catch {
       setError("E-mail ou mot de passe incorrect.");

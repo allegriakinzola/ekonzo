@@ -39,6 +39,9 @@ export default async function ProfilePage() {
       select: {
         id: true,
         name: true,
+        nom: true,
+        postnom: true,
+        prenom: true,
         email: true,
         phoneNumber: true,
         createdAt: true,
@@ -55,7 +58,7 @@ export default async function ProfilePage() {
 
   if (!user) return null;
 
-  const initials = user.name
+  const initials = (user.prenom || user.name)
     .split(" ")
     .filter(Boolean)
     .map((n) => n[0])
@@ -122,9 +125,19 @@ export default async function ProfilePage() {
         <CardContent className="pt-1">
           <InfoList>
             <InfoRow
-              label="Nom complet"
+              label="Nom"
               icon={<IdentificationCardIcon className="size-3.5" />}
-              value={user.name}
+              value={user.nom || "—"}
+            />
+            <InfoRow
+              label="Postnom"
+              icon={<IdentificationCardIcon className="size-3.5" />}
+              value={user.postnom || "—"}
+            />
+            <InfoRow
+              label="Prénom"
+              icon={<IdentificationCardIcon className="size-3.5" />}
+              value={user.prenom || "—"}
             />
             <InfoRow
               label="Adresse e-mail"

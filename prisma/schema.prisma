@@ -17,6 +17,12 @@ datasource db {
 model User {
   id                  String    @id @default(cuid())
   name                String
+  /** Nom de famille */
+  nom                 String    @default("")
+  /** Postnom (RDC) */
+  postnom             String    @default("")
+  /** Prénom */
+  prenom              String    @default("")
   email               String    @unique
   emailVerified       Boolean   @default(false)
   image               String?
@@ -389,8 +395,8 @@ model PartnerBank {
   /** Identifiants OAuth pour interop ekonzo ↔ banque */
   oauthClientId     String?
   oauthClientSecret String?
-  /** SIMULATED = IdP hébergé sur ekonzo ; EXTERNAL = URLs banque réelle */
-  interopMode       BankInteropMode @default(SIMULATED)
+  /** Conservé en base — toutes les banques partenaires utilisent leur propre IdP */
+  interopMode       BankInteropMode @default(EXTERNAL)
   authorizeUrl      String?
   tokenUrl          String?
   userinfoUrl       String?
@@ -428,6 +434,9 @@ model BankCustomer {
   email         String
   passwordHash  String
   fullName      String
+  nom           String   @default("")
+  postnom       String   @default("")
+  prenom        String   @default("")
   accountNumber String
   accountName   String
   currency      Currency @default(CDF)
@@ -451,6 +460,9 @@ model BankLink {
   bankCustomerId String
   customerEmail  String
   fullName       String
+  nom            String   @default("")
+  postnom        String   @default("")
+  prenom         String   @default("")
   accountNumber  String
   accountName    String
   currency       Currency

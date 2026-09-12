@@ -21,6 +21,9 @@ export type CustomerRow = {
   id: string;
   email: string;
   fullName: string;
+  nom?: string;
+  postnom?: string;
+  prenom?: string;
   accountNumber: string;
   accountName: string;
   currency: "CDF" | "USD";
@@ -42,7 +45,9 @@ export function CustomersManager({
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [nom, setNom] = useState("");
+  const [postnom, setPostnom] = useState("");
+  const [prenom, setPrenom] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
   const [currency, setCurrency] = useState<"CDF" | "USD">("CDF");
@@ -50,7 +55,9 @@ export function CustomersManager({
   function reset() {
     setEmail("");
     setPassword("");
-    setFullName("");
+    setNom("");
+    setPostnom("");
+    setPrenom("");
     setAccountNumber("");
     setAccountName("");
     setCurrency("CDF");
@@ -68,9 +75,11 @@ export function CustomersManager({
         body: JSON.stringify({
           email,
           password,
-          fullName,
+          nom,
+          postnom,
+          prenom,
           accountNumber,
-          accountName: accountName || fullName,
+          accountName,
           currency,
         }),
       });
@@ -151,12 +160,29 @@ export function CustomersManager({
             </Alert>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="fullName">Nom complet</Label>
+            <div className="space-y-2">
+              <Label htmlFor="nom">Nom</Label>
               <Input
-                id="fullName"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                id="nom"
+                value={nom}
+                onChange={(e) => setNom(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="postnom">Postnom</Label>
+              <Input
+                id="postnom"
+                value={postnom}
+                onChange={(e) => setPostnom(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="prenom">Prénom</Label>
+              <Input
+                id="prenom"
+                value={prenom}
+                onChange={(e) => setPrenom(e.target.value)}
                 required
               />
             </div>

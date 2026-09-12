@@ -13,7 +13,7 @@ function homeForRole(role: AppRole) {
     case "SUPER_ADMIN":
       return "/admin";
     default:
-      return "/dashboard";
+      return "/profile/bank";
   }
 }
 

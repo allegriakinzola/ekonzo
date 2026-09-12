@@ -15,7 +15,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** Incrémenter après ajout de modèles pour invalider le singleton HMR en dev */
-const SCHEMA_VERSION = "bank-payment-momo-v1";
+const SCHEMA_VERSION = "person-name-parts-v1";
 
 const connectionString = process.env.DATABASE_URL!;
 

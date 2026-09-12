@@ -37,20 +37,31 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       email?: string;
       password?: string;
+      nom?: string;
+      postnom?: string;
+      prenom?: string;
       fullName?: string;
       accountNumber?: string;
       accountName?: string;
       currency?: Currency;
     };
 
-    if (
-      !body.email ||
-      !body.password ||
-      !body.fullName ||
-      !body.accountNumber
-    ) {
+    // Compat : ancien fullName → découpé naïvement si besoin
+    let nom = (body.nom ?? "").trim();
+    let postnom = (body.postnom ?? "").trim();
+    let prenom = (body.prenom ?? "").trim();
+    if ((!nom || !prenom) && body.fullName) {
+      const parts = body.fullName.trim().split(/\s+/);
+      nom = nom || parts[0] || "";
+      prenom = prenom || parts[parts.length - 1] || "";
+      if (!postnom && parts.length > 2) {
+        postnom = parts.slice(1, -1).join(" ");
+      }
+    }
+
+    if (!body.email || !body.password || !nom || !prenom || !body.accountNumber) {
       return NextResponse.json(
-        { error: "Champs obligatoires manquants" },
+        { error: "Champs obligatoires manquants (nom, prénom, e-mail, compte)" },
         { status: 400 },
       );
     }
@@ -59,9 +70,11 @@ export async function POST(req: NextRequest) {
       partnerBankId: ctx.bank.id,
       email: body.email,
       password: body.password,
-      fullName: body.fullName,
+      nom,
+      postnom,
+      prenom,
       accountNumber: body.accountNumber,
-      accountName: body.accountName || body.fullName,
+      accountName: body.accountName || "",
       currency: body.currency === "USD" ? "USD" : "CDF",
     });
 
@@ -69,6 +82,9 @@ export async function POST(req: NextRequest) {
       {
         id: customer.id,
         email: customer.email,
+        nom: customer.nom,
+        postnom: customer.postnom,
+        prenom: customer.prenom,
         fullName: customer.fullName,
         accountNumber: customer.accountNumber,
         accountName: customer.accountName,

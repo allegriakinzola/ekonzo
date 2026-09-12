@@ -13,7 +13,9 @@ import { Alert } from "@/components/ui/alert";
 
 const registerSchema = z
   .object({
-    name: z.string().min(2, "Nom trop court"),
+    nom: z.string().min(1, "Nom requis"),
+    postnom: z.string().optional(),
+    prenom: z.string().min(1, "Prénom requis"),
     email: z.string().email("E-mail invalide"),
     password: z.string().min(8, "Au moins 8 caractères"),
     confirm: z.string().min(1, "Confirmation requise"),
@@ -37,7 +39,6 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState<{
-    name: string;
     email: string;
     password: string;
   } | null>(null);
@@ -54,7 +55,9 @@ export default function RegisterPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: data.name.trim(),
+          nom: data.nom.trim(),
+          postnom: (data.postnom ?? "").trim(),
+          prenom: data.prenom.trim(),
           email,
           password: data.password,
         }),
@@ -64,7 +67,7 @@ export default function RegisterPage() {
         throw new Error(json.error || "Impossible de démarrer l'inscription.");
       }
 
-      setPending({ name: data.name.trim(), email, password: data.password });
+      setPending({ email, password: data.password });
       setStep("otp");
     } catch (e) {
       setError(
@@ -98,7 +101,7 @@ export default function RegisterPage() {
       });
       if (signedIn.error) throw new Error(signedIn.error.message);
 
-      router.push("/dashboard");
+      router.push("/profile/bank");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Code invalide ou expiré.");
     } finally {
@@ -183,14 +186,37 @@ export default function RegisterPage() {
               onSubmit={form.handleSubmit(onRegister)}
               className="space-y-4"
             >
-              <div className="space-y-2">
-                <Label htmlFor="name">Nom complet</Label>
-                <Input id="name" className="h-11" {...form.register("name")} />
-                {form.formState.errors.name && (
-                  <p className="text-xs text-destructive">
-                    {form.formState.errors.name.message}
-                  </p>
-                )}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="nom">Nom</Label>
+                  <Input id="nom" className="h-11" {...form.register("nom")} />
+                  {form.formState.errors.nom && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.nom.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="postnom">Postnom</Label>
+                  <Input
+                    id="postnom"
+                    className="h-11"
+                    {...form.register("postnom")}
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="prenom">Prénom</Label>
+                  <Input
+                    id="prenom"
+                    className="h-11"
+                    {...form.register("prenom")}
+                  />
+                  {form.formState.errors.prenom && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.prenom.message}
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">E-mail</Label>

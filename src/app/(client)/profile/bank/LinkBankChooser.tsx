@@ -57,9 +57,12 @@ const STEPS = [
 export function LinkBankChooser({
   banks,
   currentLink,
+  requireLink = false,
 }: {
   banks: Bank[];
   currentLink: CurrentLink;
+  /** Première liaison : pas de sortie vers le reste de l'app */
+  requireLink?: boolean;
 }) {
   const [error, setError] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -233,13 +236,15 @@ export function LinkBankChooser({
       <div className="flex flex-col gap-4 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
         <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground sm:max-w-md">
           <ShieldCheckIcon className="mt-0.5 size-4 shrink-0" weight="duotone" />
-          Vos identifiants bancaires sont saisis uniquement sur le site de votre
-          banque. ekonzo ne reçoit que le titulaire, le numéro de compte et la
-          devise.
+          {requireLink
+            ? "Sans banque liée, l'accès au tableau de bord, aux produits et au portefeuille reste bloqué."
+            : "Vos identifiants bancaires sont saisis uniquement sur le site de votre banque. ekonzo ne reçoit que le titulaire, le numéro de compte et la devise."}
         </p>
-        <Button variant="outline" size="sm" render={<Link href="/profile" />}>
-          Retour aux paramètres
-        </Button>
+        {!requireLink && (
+          <Button variant="outline" size="sm" render={<Link href="/profile" />}>
+            Retour aux paramètres
+          </Button>
+        )}
       </div>
     </div>
   );

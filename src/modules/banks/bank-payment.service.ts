@@ -43,7 +43,7 @@ export function formatPayAmount(amount: number, currency: Currency) {
 
 /**
  * Crée une session de paiement banque pour une souscription PENDING_PAYMENT
- * et renvoie l'URL de redirection vers l'UI banque (simulée ou externe).
+ * et renvoie l'URL de redirection vers l'UI de paiement de la banque.
  */
 export async function startBankPayment(input: {
   subscriptionId: string;
@@ -145,10 +145,8 @@ export async function startBankPayment(input: {
     data: { paymentRef: `bankpay_${session.id}` },
   });
 
-  // Mode simulé : UI IdP hébergée sur ekonzo
-  // Mode externe : URL banque (fallback simulé si absente)
-  const redirectUrl =
-    bank.interopMode === "EXTERNAL" && bank.authorizeUrl
+  // Redirection vers le portail de la banque (URLs d'intégration)
+  const redirectUrl = bank.authorizeUrl
       ? (() => {
           const u = new URL(
             bank.authorizeUrl!.replace(/\/oauth\/authorize\/?$/, "/payments/pay"),

@@ -1,6 +1,7 @@
-import { createHash, randomBytes } from "crypto";
+import { createHash } from "crypto";
 import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { generateBankOAuthCredentials } from "@/modules/banks/oauth-credentials";
 
 const MAX_LOGO_BYTES = 512 * 1024; // 512 Ko
 
@@ -11,6 +12,18 @@ function slugCode(raw: string) {
     .replace(/[^A-Z0-9]+/g, "_")
     .replace(/^_|_$/g, "")
     .slice(0, 32);
+}
+
+export { generateBankOAuthCredentials } from "@/modules/banks/oauth-credentials";
+
+/** Régénère les clés d'intégration d'une banque (invalide les anciennes). */
+export async function regenerateBankOAuthCredentials(bankId: string) {
+  const { oauthClientId, oauthClientSecret } =
+    await generateBankOAuthCredentials();
+  return prisma.partnerBank.update({
+    where: { id: bankId },
+    data: { oauthClientId, oauthClientSecret },
+  });
 }
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -85,15 +98,26 @@ export async function createPartnerBank(input: {
   email: string;
   password: string;
   logoFile?: File | null;
+  authorizeUrl: string;
+  tokenUrl: string;
+  userinfoUrl: string;
 }) {
   const email = input.email.trim().toLowerCase();
   const code = slugCode(input.code || input.shortName);
   const password = input.password;
+  const authorizeUrl = input.authorizeUrl.trim();
+  const tokenUrl = input.tokenUrl.trim();
+  const userinfoUrl = input.userinfoUrl.trim();
 
   if (!code) throw new Error("Code banque invalide");
   if (!email.includes("@")) throw new Error("E-mail invalide");
   if (password.length < 8) {
     throw new Error("Mot de passe : 8 caractères minimum");
+  }
+  if (!authorizeUrl || !tokenUrl || !userinfoUrl) {
+    throw new Error(
+      "URLs d'intégration requises (authorize, token, userinfo)",
+    );
   }
 
   const existing = await prisma.partnerBank.findFirst({
@@ -106,6 +130,8 @@ export async function createPartnerBank(input: {
 
   const hashed = await hash(password, 12);
   const now = new Date();
+  const { oauthClientId, oauthClientSecret } =
+    await generateBankOAuthCredentials();
 
   const user = await prisma.user.create({
     data: {
@@ -134,8 +160,12 @@ export async function createPartnerBank(input: {
       userId: user.id,
       isActive: true,
       activatedAt: now,
-      oauthClientSecret: randomBytes(32).toString("hex"),
-      interopMode: "SIMULATED",
+      oauthClientId,
+      oauthClientSecret,
+      interopMode: "EXTERNAL",
+      authorizeUrl,
+      tokenUrl,
+      userinfoUrl,
     },
   });
 

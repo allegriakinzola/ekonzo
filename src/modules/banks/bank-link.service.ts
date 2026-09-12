@@ -2,6 +2,10 @@ import { createHash, randomBytes } from "crypto";
 import { compare, hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import type { Currency } from "@prisma/client";
+import {
+  generateBankOAuthCredentials,
+} from "@/modules/banks/oauth-credentials";
+import { composePersonName, normalizeNamePart } from "@/lib/person-name";
 
 const AUTH_TTL_MS = 1000 * 60 * 15;
 const CODE_TTL_MS = 1000 * 60 * 5;
@@ -25,12 +29,12 @@ export async function ensureBankOAuthCredentials(bankId: string) {
   });
   if (bank.oauthClientId && bank.oauthClientSecret) return bank;
 
+  const creds = await generateBankOAuthCredentials();
   return prisma.partnerBank.update({
     where: { id: bankId },
     data: {
-      oauthClientId: bank.oauthClientId ?? `ekz_${randomBytes(12).toString("hex")}`,
-      oauthClientSecret:
-        bank.oauthClientSecret ?? randomBytes(32).toString("hex"),
+      oauthClientId: bank.oauthClientId ?? creds.oauthClientId,
+      oauthClientSecret: bank.oauthClientSecret ?? creds.oauthClientSecret,
     },
   });
 }
@@ -108,7 +112,7 @@ export async function startBankLink(userId: string, partnerBankId: string) {
   });
 
   const authorizeUrl =
-    bank.interopMode === "EXTERNAL" && bank.authorizeUrl
+    bank.authorizeUrl
       ? (() => {
           const u = new URL(bank.authorizeUrl);
           u.searchParams.set("response_type", "code");
@@ -147,7 +151,7 @@ export async function completeBankLinkCallback(input: {
 
   let accessToken: string;
 
-  if (bank.interopMode === "EXTERNAL" && bank.tokenUrl && bank.userinfoUrl) {
+  if (bank.tokenUrl && bank.userinfoUrl) {
     const tokenRes = await fetch(bank.tokenUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -173,6 +177,9 @@ export async function completeBankLinkCallback(input: {
     });
     const info = (await infoRes.json()) as {
       bankCustomerId?: string;
+      nom?: string;
+      postnom?: string;
+      prenom?: string;
       fullName?: string;
       email?: string;
       accountNumber?: string;
@@ -184,17 +191,27 @@ export async function completeBankLinkCallback(input: {
       throw new Error(info.error || "Profil bancaire incomplet");
     }
 
+    const nom = normalizeNamePart(info.nom ?? "");
+    const postnom = normalizeNamePart(info.postnom ?? "");
+    const prenom = normalizeNamePart(info.prenom ?? "");
+    const fullName =
+      composePersonName({ nom, postnom, prenom }) ||
+      (info.fullName ?? "").trim();
+
     return persistBankLink(input.userId, bank, {
       bankCustomerId: info.bankCustomerId,
       email: info.email,
-      fullName: info.fullName,
+      nom,
+      postnom,
+      prenom,
+      fullName,
       accountNumber: info.accountNumber,
       accountName: info.accountName,
       currency: info.currency,
     });
   }
 
-  // Mode SIMULATED — appel direct (même contrat que les APIs publiques)
+  // Fallback legacy (sans URLs d'intégration) — IdP hébergé ekonzo
   const token = await exchangeAuthorizationCode(bank.code, {
     grant_type: "authorization_code",
     code: input.code,
@@ -218,6 +235,9 @@ async function persistBankLink(
   info: {
     bankCustomerId: string;
     email?: string;
+    nom?: string;
+    postnom?: string;
+    prenom?: string;
     fullName?: string;
     accountNumber: string;
     accountName?: string;
@@ -225,6 +245,11 @@ async function persistBankLink(
   },
 ) {
   const currency = (info.currency ?? "CDF") as Currency;
+  const nom = normalizeNamePart(info.nom ?? "");
+  const postnom = normalizeNamePart(info.postnom ?? "");
+  const prenom = normalizeNamePart(info.prenom ?? "");
+  const fullName =
+    composePersonName({ nom, postnom, prenom }) || (info.fullName ?? "").trim();
 
   const link = await prisma.bankLink.upsert({
     where: { userId },
@@ -233,18 +258,24 @@ async function persistBankLink(
       partnerBankId: bank.id,
       bankCustomerId: info.bankCustomerId,
       customerEmail: info.email ?? "",
-      fullName: info.fullName ?? "",
+      fullName,
+      nom,
+      postnom,
+      prenom,
       accountNumber: info.accountNumber,
-      accountName: info.accountName ?? info.fullName ?? "",
+      accountName: info.accountName ?? fullName,
       currency,
     },
     update: {
       partnerBankId: bank.id,
       bankCustomerId: info.bankCustomerId,
       customerEmail: info.email ?? "",
-      fullName: info.fullName ?? "",
+      fullName,
+      nom,
+      postnom,
+      prenom,
       accountNumber: info.accountNumber,
-      accountName: info.accountName ?? info.fullName ?? "",
+      accountName: info.accountName ?? fullName,
       currency,
       linkedAt: new Date(),
     },
@@ -268,13 +299,13 @@ async function persistBankLink(
       preferredChannel: "BANK_TRANSFER",
       bankName: bank.name,
       bankAccountNumber: info.accountNumber,
-      bankAccountName: info.accountName ?? info.fullName ?? "",
+      bankAccountName: info.accountName ?? fullName,
     },
     update: {
       preferredChannel: "BANK_TRANSFER",
       bankName: bank.name,
       bankAccountNumber: info.accountNumber,
-      bankAccountName: info.accountName ?? info.fullName ?? "",
+      bankAccountName: info.accountName ?? fullName,
     },
   });
 
@@ -290,7 +321,7 @@ async function persistBankLink(
       userId,
       bankName: bank.name,
       accountNumber: info.accountNumber,
-      accountName: info.accountName ?? info.fullName ?? "",
+      accountName: info.accountName ?? fullName,
       currency,
       channel: "SIMAD",
       isVerified: true,
@@ -298,7 +329,7 @@ async function persistBankLink(
     },
     update: {
       bankName: bank.name,
-      accountName: info.accountName ?? info.fullName ?? "",
+      accountName: info.accountName ?? fullName,
       isVerified: true,
       isDefault: true,
     },
@@ -494,6 +525,9 @@ export async function getUserinfoFromAccessToken(
   return {
     bankCustomerId: customer.id,
     email: customer.email,
+    nom: customer.nom,
+    postnom: customer.postnom,
+    prenom: customer.prenom,
     fullName: customer.fullName,
     accountNumber: customer.accountNumber,
     accountName: customer.accountName,
@@ -515,6 +549,9 @@ export async function listBankCustomers(partnerBankId: string) {
       id: true,
       email: true,
       fullName: true,
+      nom: true,
+      postnom: true,
+      prenom: true,
       accountNumber: true,
       accountName: true,
       currency: true,
@@ -528,7 +565,9 @@ export async function createBankCustomer(input: {
   partnerBankId: string;
   email: string;
   password: string;
-  fullName: string;
+  nom: string;
+  postnom?: string;
+  prenom: string;
   accountNumber: string;
   accountName: string;
   currency: Currency;
@@ -538,15 +577,23 @@ export async function createBankCustomer(input: {
   if (input.password.length < 8) {
     throw new Error("Mot de passe : 8 caractères minimum");
   }
+  const nom = normalizeNamePart(input.nom);
+  const postnom = normalizeNamePart(input.postnom ?? "");
+  const prenom = normalizeNamePart(input.prenom);
+  if (!nom || !prenom) throw new Error("Nom et prénom requis");
+  const fullName = composePersonName({ nom, postnom, prenom });
 
   return prisma.bankCustomer.create({
     data: {
       partnerBankId: input.partnerBankId,
       email,
       passwordHash: await hash(input.password, 12),
-      fullName: input.fullName.trim(),
+      fullName,
+      nom,
+      postnom,
+      prenom,
       accountNumber: input.accountNumber.trim(),
-      accountName: input.accountName.trim() || input.fullName.trim(),
+      accountName: input.accountName.trim() || fullName,
       currency: input.currency,
     },
   });

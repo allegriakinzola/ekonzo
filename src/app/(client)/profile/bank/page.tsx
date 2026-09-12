@@ -16,17 +16,17 @@ export default async function LinkBankPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className={link ? "mx-auto max-w-3xl space-y-8" : "space-y-8"}>
       <PageHeader
-        backHref="/profile"
+        backHref={link ? "/profile" : undefined}
         backLabel="Paramètres"
         eyebrow="Banque partenaire"
         icon={<BankIcon className="size-4" weight="duotone" />}
-        title={link ? "Changer de banque" : "Lier ma banque"}
+        title={link ? "Changer de banque" : "Connectez votre banque"}
         description={
           link
             ? `Vous êtes actuellement lié à ${link.partnerBank.name}. Sélectionnez une autre banque partenaire pour remplacer cette liaison.`
-            : "Choisissez la banque qui tient votre compte. Vous serez redirigé vers son interface pour vous authentifier, puis ramené sur ekonzo."
+            : "Avant d'accéder aux titres publics, vous devez lier le compte d'une banque partenaire. Cette étape est obligatoire."
         }
       />
 
@@ -44,6 +44,7 @@ export default async function LinkBankPage() {
               }
             : null
         }
+        requireLink={!link}
       />
     </div>
   );

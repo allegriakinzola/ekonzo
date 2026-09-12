@@ -37,6 +37,9 @@ export async function POST(req: NextRequest) {
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     const logo = form.get("logo");
+    const authorizeUrl = String(form.get("authorizeUrl") ?? "").trim();
+    const tokenUrl = String(form.get("tokenUrl") ?? "").trim();
+    const userinfoUrl = String(form.get("userinfoUrl") ?? "").trim();
 
     if (!name || !shortName || !email || !password) {
       return NextResponse.json(
@@ -48,6 +51,16 @@ export async function POST(req: NextRequest) {
     if (password.length < 8) {
       return NextResponse.json(
         { error: "Mot de passe : 8 caractères minimum" },
+        { status: 400 },
+      );
+    }
+
+    if (!authorizeUrl || !tokenUrl || !userinfoUrl) {
+      return NextResponse.json(
+        {
+          error:
+            "URLs d'intégration requises (authorize, token, userinfo)",
+        },
         { status: 400 },
       );
     }
@@ -69,6 +82,9 @@ export async function POST(req: NextRequest) {
       email,
       password,
       logoFile,
+      authorizeUrl,
+      tokenUrl,
+      userinfoUrl,
     });
 
     return NextResponse.json(bank, { status: 201 });

@@ -19,12 +19,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EmissionCard } from "@/components/EmissionCard";
 import { formatAmount, formatDate, daysUntil } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import {
-  getCommittedVolumes,
-  volumeLeft as calcVolumeLeft,
-} from "@/lib/product-volume";
 import { requireRole } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { getActiveBankLink } from "@/modules/banks/bank-link.service";
@@ -52,8 +49,13 @@ const QUICK_ACTIONS = [
 
 export default async function DashboardPage() {
   const session = await requireRole("CLIENT");
-  const userName = session.user.name ?? "Utilisateur";
-  const firstName = userName.split(" ")[0];
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { prenom: true, name: true },
+  });
+  const firstName =
+    dbUser?.prenom?.trim() ||
+    (session.user.name ?? "Utilisateur").split(" ")[0];
   const bankLink = await getActiveBankLink(session.user.id);
 
   const [subscriptions, openProducts, openCount] = await Promise.all([
@@ -69,18 +71,18 @@ export default async function DashboardPage() {
       select: {
         id: true,
         code: true,
+        type: true,
+        instrumentType: true,
         currency: true,
-        minTicket: true,
+        lineLabel: true,
+        announcedRate: true,
         discountRate: true,
-        maturityDate: true,
+        couponRate: true,
         subscriptionDeadline: true,
-        totalVolume: true,
       },
     }),
     prisma.product.count({ where: { status: "OPEN" } }),
   ]);
-
-  const committedMap = await getCommittedVolumes(openProducts.map((p) => p.id));
 
   const realSubscriptions = subscriptions.filter(
     (s) => s.status !== "FAILED" && s.status !== "CANCELLED",
@@ -152,7 +154,11 @@ export default async function DashboardPage() {
             Bonjour, {firstName}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Bienvenue sur votre espace investisseur ekonzo.
+            Bienvenue sur votre espace investisseur ekonzo
+            {bankLink
+              ? ` · banque ${bankLink.partnerBank.shortName}`
+              : ""}
+            .
           </p>
         </div>
         <Button render={<Link href="/products" />} size="lg">
@@ -260,80 +266,9 @@ export default async function DashboardPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {openProducts.map((p) => {
-              const days = daysUntil(p.subscriptionDeadline);
-              const rate = p.discountRate;
-              const committed = committedMap.get(p.id) ?? 0;
-              const volumeLeft = calcVolumeLeft(
-                p.totalVolume.toString(),
-                committed,
-              );
-              const pct = Math.round((committed / Number(p.totalVolume)) * 100);
-              return (
-                <Link
-                  key={p.id}
-                  href={`/products/${p.id}`}
-                  className="group"
-                >
-                  <Card className="h-full transition-shadow group-hover:shadow-md ring-1 ring-rdc-navy/5">
-                    <CardHeader className="border-b [.border-b]:pb-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className="border-primary/20 bg-primary/10 text-primary"
-                          >
-                            Bon du Trésor
-                          </Badge>
-                          <span className="text-xs font-mono text-muted-foreground">
-                            {p.code}
-                          </span>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            days <= 3
-                              ? "border-destructive/20 bg-destructive/10 text-destructive"
-                              : "border-border bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {days <= 3 ? `${days}j` : `${days}j restants`}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Taux d&apos;escompte</p>
-                          <p className="text-2xl font-bold text-primary">
-                            {rate ? `${(Number(rate) * 100).toFixed(2)} %` : "—"}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Ticket mini</p>
-                          <p className="text-sm font-semibold">
-                            {formatAmount(p.minTicket.toString(), p.currency)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Maturité : {formatDate(p.maturityDate)}</span>
-                        <span>{p.currency}</span>
-                      </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary/60"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <p className="text-[10px] text-muted-foreground">
-                        {formatAmount(volumeLeft.toString(), p.currency)} disponible
-                      </p>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
+            {openProducts.map((p) => (
+              <EmissionCard key={p.id} product={p} />
+            ))}
           </div>
         )}
       </div>

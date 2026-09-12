@@ -22,7 +22,6 @@ export default async function AdminBanksPage() {
     email: b.email,
     logoUrl: b.logoUrl,
     isActive: b.isActive,
-    interopMode: b.interopMode,
     activatedAt: b.activatedAt?.toISOString() ?? null,
     createdAt: b.createdAt.toISOString(),
     linkedClients: b._count.links,

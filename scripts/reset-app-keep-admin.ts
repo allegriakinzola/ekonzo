@@ -1,3 +1,7 @@
+/**
+ * Purge totale sauf l'admin principal (SEED_ADMIN_EMAIL / admin@ekonzo.cd).
+ * Usage: npx tsx scripts/reset-app-keep-admin.ts
+ */
 import { config } from "dotenv";
 config({ path: ".env" });
 
@@ -11,79 +15,124 @@ neonConfig.useSecureWebSocket = true;
 neonConfig.pipelineTLS = false;
 neonConfig.pipelineConnect = false;
 
-const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient({
+  adapter: new PrismaNeon({ connectionString: process.env.DATABASE_URL! }),
+});
+
+const KEEP_EMAIL = (
+  process.env.SEED_ADMIN_EMAIL ?? "admin@ekonzo.cd"
+).toLowerCase();
 
 async function main() {
-  console.log("Réinitialisation : conservation des comptes ADMIN / SUPER_ADMIN uniquement…\n");
+  const admin = await prisma.user.findUnique({ where: { email: KEEP_EMAIL } });
+  if (!admin) {
+    throw new Error(
+      `Admin principal introuvable (${KEEP_EMAIL}). Abandon — aucune suppression.`,
+    );
+  }
 
-  // 1. Couches financières (RESTRICT)
+  console.log(`Conservation : ${admin.email} [${admin.role}] (${admin.id})\n`);
+
+  // ── Banques / interop (enfants d'abord) ──────────────────────────────
+  const paymentSessions = await prisma.bankPaymentSession.deleteMany();
+  console.log(`BankPaymentSession : ${paymentSessions.count}`);
+
+  const oauthSessions = await prisma.bankOAuthSession.deleteMany();
+  console.log(`BankOAuthSession : ${oauthSessions.count}`);
+
+  const bankLinks = await prisma.bankLink.deleteMany();
+  console.log(`BankLink : ${bankLinks.count}`);
+
+  const bankCustomers = await prisma.bankCustomer.deleteMany();
+  console.log(`BankCustomer : ${bankCustomers.count}`);
+
+  const bankInvites = await prisma.bankInviteToken.deleteMany();
+  console.log(`BankInviteToken : ${bankInvites.count}`);
+
+  // Détacher userId avant suppression des banques (évite FK user)
+  await prisma.partnerBank.updateMany({ data: { userId: null } });
+  const banks = await prisma.partnerBank.deleteMany();
+  console.log(`PartnerBank : ${banks.count}`);
+
+  // ── Couches financières ──────────────────────────────────────────────
   const coupons = await prisma.coupon.deleteMany();
-  console.log(`Coupons : ${coupons.count}`);
+  console.log(`Coupon : ${coupons.count}`);
 
   const transactions = await prisma.transaction.deleteMany();
-  console.log(`Transactions : ${transactions.count}`);
+  console.log(`Transaction : ${transactions.count}`);
 
   const subscriptions = await prisma.subscription.deleteMany();
-  console.log(`Souscriptions : ${subscriptions.count}`);
+  console.log(`Subscription : ${subscriptions.count}`);
 
   const products = await prisma.product.deleteMany();
-  console.log(`Produits (BT/OT) : ${products.count}`);
+  console.log(`Product : ${products.count}`);
 
   const rates = await prisma.exchangeRate.deleteMany();
-  console.log(`Taux de change : ${rates.count}`);
+  console.log(`ExchangeRate : ${rates.count}`);
 
-  // 2. Données liées aux clients
-  const clients = await prisma.user.findMany({
-    where: { role: { notIn: ["ADMIN", "SUPER_ADMIN"] } },
-    select: { id: true, phoneNumber: true, name: true },
-  });
-  const clientIds = clients.map((u) => u.id);
-  console.log(`\nClients à supprimer : ${clients.length}`);
-  for (const u of clients) {
-    console.log(`  - ${u.phoneNumber ?? u.id} (${u.name})`);
-  }
+  // ── Profils / comptes / auth secondaires ───────────────────────────
+  const settlements = await prisma.settlementProfile.deleteMany();
+  console.log(`SettlementProfile : ${settlements.count}`);
 
-  if (clientIds.length > 0) {
-    await prisma.settlementProfile.deleteMany({ where: { userId: { in: clientIds } } });
-    await prisma.notification.deleteMany({ where: { userId: { in: clientIds } } });
-    await prisma.momoAccount.deleteMany({ where: { userId: { in: clientIds } } });
-    await prisma.bankAccount.deleteMany({ where: { userId: { in: clientIds } } });
-    await prisma.wallet.deleteMany({ where: { userId: { in: clientIds } } });
-    await prisma.session.deleteMany({ where: { userId: { in: clientIds } } });
-    await prisma.account.deleteMany({ where: { userId: { in: clientIds } } });
-  }
+  const notifications = await prisma.notification.deleteMany();
+  console.log(`Notification : ${notifications.count}`);
 
-  // Audit / OTP / tentatives de login (toute l'app)
+  const momo = await prisma.momoAccount.deleteMany();
+  console.log(`MomoAccount : ${momo.count}`);
+
+  const bankAccounts = await prisma.bankAccount.deleteMany();
+  console.log(`BankAccount : ${bankAccounts.count}`);
+
+  const wallets = await prisma.wallet.deleteMany();
+  console.log(`Wallet : ${wallets.count}`);
+
   const audits = await prisma.auditLog.deleteMany();
-  console.log(`\nAudit logs : ${audits.count}`);
+  console.log(`AuditLog : ${audits.count}`);
+
   const verifications = await prisma.verification.deleteMany();
-  console.log(`OTP / verifications : ${verifications.count}`);
+  console.log(`Verification : ${verifications.count}`);
+
   const logins = await prisma.loginAttempt.deleteMany();
-  console.log(`Login attempts : ${logins.count}`);
+  console.log(`LoginAttempt : ${logins.count}`);
 
-  const deletedUsers = await prisma.user.deleteMany({
-    where: { role: { notIn: ["ADMIN", "SUPER_ADMIN"] } },
+  // ── Tous les users sauf l'admin principal ────────────────────────────
+  const others = await prisma.user.findMany({
+    where: { id: { not: admin.id } },
+    select: { id: true, email: true, role: true, name: true },
   });
-  console.log(`Utilisateurs clients supprimés : ${deletedUsers.count}`);
-
-  // Nettoyage sessions admin optionnel — on garde le compte, on peut reset les sessions
-  const admins = await prisma.user.findMany({
-    where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } },
-    select: { id: true, phoneNumber: true, name: true, role: true },
-  });
-
-  console.log("\nComptes conservés :");
-  for (const a of admins) {
-    console.log(`  ✓ ${a.phoneNumber ?? "—"} — ${a.name} [${a.role}]`);
+  console.log(`\nUtilisateurs à supprimer : ${others.length}`);
+  for (const u of others) {
+    console.log(`  - ${u.email} [${u.role}] ${u.name}`);
   }
 
+  if (others.length > 0) {
+    const ids = others.map((u) => u.id);
+    await prisma.session.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.account.deleteMany({ where: { userId: { in: ids } } });
+    const deleted = await prisma.user.deleteMany({ where: { id: { in: ids } } });
+    console.log(`Utilisateurs supprimés : ${deleted.count}`);
+  }
+
+  // Sessions admin : on peut les garder ; optionnel reset
   const leftovers = {
-    users: await prisma.user.count(),
+    users: await prisma.user.findMany({
+      select: { email: true, role: true, name: true },
+    }),
     products: await prisma.product.count(),
     subscriptions: await prisma.subscription.count(),
+    banks: await prisma.partnerBank.count(),
+    paymentSessions: await prisma.bankPaymentSession.count(),
   };
-  console.log("\nÉtat final :", leftovers);
+
+  console.log("\nÉtat final :");
+  console.log(`  users = ${leftovers.users.length}`);
+  for (const u of leftovers.users) {
+    console.log(`    ✓ ${u.email} — ${u.name} [${u.role}]`);
+  }
+  console.log(`  products = ${leftovers.products}`);
+  console.log(`  subscriptions = ${leftovers.subscriptions}`);
+  console.log(`  banks = ${leftovers.banks}`);
+  console.log(`  paymentSessions = ${leftovers.paymentSessions}`);
 }
 
 main()

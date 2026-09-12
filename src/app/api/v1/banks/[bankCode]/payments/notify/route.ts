@@ -7,6 +7,7 @@ const bodySchema = z.object({
   client_secret: z.string().min(1),
   token: z.string().min(16),
   notify_ref: z.string().optional(),
+  channel: z.enum(["BANK_TRANSFER", "MOBILE_MONEY"]).optional(),
 });
 
 /**
@@ -32,6 +33,7 @@ export async function POST(
     clientSecret: body.data.client_secret,
     token: body.data.token,
     notifyRef: body.data.notify_ref,
+    channel: body.data.channel,
   });
 
   if (!result.ok) {
@@ -46,5 +48,6 @@ export async function POST(
     alreadyProcessed: result.alreadyProcessed ?? false,
     subscriptionId: result.subscriptionId,
     notifyRef: "notifyRef" in result ? result.notifyRef : undefined,
+    returnUrl: "returnUrl" in result ? result.returnUrl : undefined,
   });
 }

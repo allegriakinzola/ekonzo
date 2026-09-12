@@ -3,12 +3,16 @@ import { hash as bcryptHash, compare as bcryptCompare } from "bcryptjs";
 
 import { prisma } from "@/lib/prisma";
 import { sendOtpEmail } from "@/lib/mailer";
+import { composePersonName, normalizeNamePart } from "@/lib/person-name";
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const PENDING_PREFIX = "register:";
 const MAX_ATTEMPTS = 5;
 
 type PendingPayload = {
+  nom: string;
+  postnom: string;
+  prenom: string;
   name: string;
   passwordHash: string;
   otpHash: string;
@@ -77,14 +81,20 @@ export async function purgeStaleUnverifiedClients() {
 }
 
 export async function startRegistration(input: {
-  name: string;
+  nom: string;
+  postnom?: string;
+  prenom: string;
   email: string;
   password: string;
 }) {
   const email = normalizeEmail(input.email);
-  const name = input.name.trim();
+  const nom = normalizeNamePart(input.nom);
+  const postnom = normalizeNamePart(input.postnom ?? "");
+  const prenom = normalizeNamePart(input.prenom);
+  const name = composePersonName({ nom, postnom, prenom });
 
-  if (name.length < 2) throw new Error("Nom trop court");
+  if (nom.length < 1) throw new Error("Nom requis");
+  if (prenom.length < 1) throw new Error("Prénom requis");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error("E-mail invalide");
   }
@@ -110,6 +120,9 @@ export async function startRegistration(input: {
   const otp = generateOtp();
   const passwordHash = await bcryptHash(input.password, 12);
   const payload: PendingPayload = {
+    nom,
+    postnom,
+    prenom,
     name,
     passwordHash,
     otpHash: hashOtp(otp),
@@ -227,6 +240,9 @@ export async function confirmRegistration(input: {
   const user = await prisma.user.create({
     data: {
       name: payload.name,
+      nom: payload.nom,
+      postnom: payload.postnom ?? "",
+      prenom: payload.prenom,
       email,
       emailVerified: true,
       role: "CLIENT",
@@ -242,5 +258,12 @@ export async function confirmRegistration(input: {
 
   await deletePending(email);
 
-  return { userId: user.id, email, name: user.name };
+  return {
+    userId: user.id,
+    email,
+    name: user.name,
+    nom: user.nom,
+    postnom: user.postnom,
+    prenom: user.prenom,
+  };
 }
