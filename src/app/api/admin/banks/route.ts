@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
     const authorizeUrl = String(form.get("authorizeUrl") ?? "").trim();
     const tokenUrl = String(form.get("tokenUrl") ?? "").trim();
     const userinfoUrl = String(form.get("userinfoUrl") ?? "").trim();
+    const paymentUrl = String(form.get("paymentUrl") ?? "").trim();
 
     if (!name || !shortName || !email || !password) {
       return NextResponse.json(
@@ -55,11 +56,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!authorizeUrl || !tokenUrl || !userinfoUrl) {
+    if (!authorizeUrl || !tokenUrl || !userinfoUrl || !paymentUrl) {
       return NextResponse.json(
         {
           error:
-            "URLs d'intégration requises (authorize, token, userinfo)",
+            "URLs d'intégration requises (authorize, token, userinfo, payment)",
         },
         { status: 400 },
       );
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
       authorizeUrl,
       tokenUrl,
       userinfoUrl,
+      paymentUrl,
     });
 
     return NextResponse.json(bank, { status: 201 });

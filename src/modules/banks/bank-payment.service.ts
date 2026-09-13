@@ -19,6 +19,7 @@ import {
   normalizeMomoPhone,
 } from "@/modules/payments/phone";
 import type { PaymentStatus } from "@/modules/payments/payment.types";
+import { buildBankPageUrl } from "@/modules/banks/bank-urls";
 
 const PAY_TTL_MS = 1000 * 60 * 30;
 
@@ -145,17 +146,20 @@ export async function startBankPayment(input: {
     data: { paymentRef: `bankpay_${session.id}` },
   });
 
-  // Redirection vers le portail de la banque (URLs d'intégration)
-  const redirectUrl = bank.authorizeUrl
-      ? (() => {
-          const u = new URL(
-            bank.authorizeUrl!.replace(/\/oauth\/authorize\/?$/, "/payments/pay"),
-          );
-          u.searchParams.set("token", rawToken);
-          u.searchParams.set("client_id", bank.oauthClientId!);
-          return u.toString();
-        })()
-      : `${appUrl()}/idp/${bank.code}/pay?token=${rawToken}`;
+  // Redirection vers la page paiement configurée par la banque
+  if (!bank.paymentUrl?.trim()) {
+    throw new Error(
+      "Page de paiement non configurée pour cette banque. Renseignez paymentUrl dans la console banque (/bank/pages).",
+    );
+  }
+  if (!bank.oauthClientId) {
+    throw new Error("Identifiants OAuth banque manquants");
+  }
+
+  const redirectUrl = buildBankPageUrl(bank.paymentUrl, {
+    token: rawToken,
+    client_id: bank.oauthClientId,
+  });
 
   return {
     sessionId: session.id,

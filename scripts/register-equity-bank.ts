@@ -70,6 +70,8 @@ async function main() {
     process.env.EQUITY_TOKEN_URL ?? `${equityBase}/api/oauth/token`;
   const userinfoUrl =
     process.env.EQUITY_USERINFO_URL ?? `${equityBase}/api/oauth/userinfo`;
+  const paymentUrl =
+    process.env.EQUITY_PAYMENT_URL ?? `${equityBase}/payments/pay`;
 
   const email = (
     process.env.EQUITY_BANK_EMAIL ?? "espace@equity.cd"
@@ -125,6 +127,7 @@ async function main() {
         authorizeUrl,
         tokenUrl,
         userinfoUrl,
+        paymentUrl,
         oauthClientId,
         oauthClientSecret,
       },
@@ -138,6 +141,7 @@ async function main() {
         authorizeUrl,
         tokenUrl,
         userinfoUrl,
+        paymentUrl,
         oauthClientId,
         oauthClientSecret,
         activatedAt: bank.activatedAt ?? new Date(),
@@ -158,6 +162,7 @@ async function main() {
   console.log(`   authorizeUrl = ${authorizeUrl}`);
   console.log(`   tokenUrl     = ${tokenUrl}`);
   console.log(`   userinfoUrl  = ${userinfoUrl}`);
+  console.log(`   paymentUrl   = ${paymentUrl}`);
   console.log(`   client_id    = ${oauthClientId}`);
   console.log("   client_secret = (écrit dans equity-bank/.env)");
   console.log("Redémarrez equity-bank pour recharger .env");

@@ -14,8 +14,8 @@ const globalForPrisma = globalThis as unknown as {
   prismaSchemaVersion?: string;
 };
 
-/** Incrémenter après ajout de modèles pour invalider le singleton HMR en dev */
-const SCHEMA_VERSION = "person-name-parts-v1";
+/** Incrémenter après ajout de modèles/champs pour invalider le singleton HMR en dev */
+const SCHEMA_VERSION = "partner-bank-payment-url-v1";
 
 const connectionString = process.env.DATABASE_URL!;
 

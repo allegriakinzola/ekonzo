@@ -6,6 +6,7 @@ import {
   generateBankOAuthCredentials,
 } from "@/modules/banks/oauth-credentials";
 import { composePersonName, normalizeNamePart } from "@/lib/person-name";
+import { buildBankPageUrl } from "@/modules/banks/bank-urls";
 
 const AUTH_TTL_MS = 1000 * 60 * 15;
 const CODE_TTL_MS = 1000 * 60 * 5;
@@ -111,21 +112,18 @@ export async function startBankLink(userId: string, partnerBankId: string) {
     },
   });
 
-  const authorizeUrl =
-    bank.authorizeUrl
-      ? (() => {
-          const u = new URL(bank.authorizeUrl);
-          u.searchParams.set("response_type", "code");
-          u.searchParams.set("client_id", bank.oauthClientId!);
-          u.searchParams.set("redirect_uri", redirectUri);
-          u.searchParams.set("state", state);
-          return u.toString();
-        })()
-      : getBankAuthorizeUrl(bank.code, {
-          clientId: bank.oauthClientId!,
-          redirectUri,
-          state,
-        });
+  const authorizeUrl = bank.authorizeUrl
+    ? buildBankPageUrl(bank.authorizeUrl, {
+        response_type: "code",
+        client_id: bank.oauthClientId!,
+        redirect_uri: redirectUri,
+        state,
+      })
+    : getBankAuthorizeUrl(bank.code, {
+        clientId: bank.oauthClientId!,
+        redirectUri,
+        state,
+      });
 
   return { authorizeUrl, state, bank };
 }

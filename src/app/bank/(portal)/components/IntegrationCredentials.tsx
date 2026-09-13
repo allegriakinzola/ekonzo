@@ -92,7 +92,8 @@ export function IntegrationCredentials({
   authorizeUrl,
   tokenUrl,
   userinfoUrl,
-  appUrl,
+  paymentUrl,
+  ekonzoApiUrl,
 }: {
   bankCode: string;
   clientId: string;
@@ -100,7 +101,9 @@ export function IntegrationCredentials({
   authorizeUrl: string | null;
   tokenUrl: string | null;
   userinfoUrl: string | null;
-  appUrl: string;
+  paymentUrl: string | null;
+  /** Base publique ekonzo (ex. https://www.ekonzo.site) */
+  ekonzoApiUrl: string;
 }) {
   const router = useRouter();
   const [id, setId] = useState(clientId);
@@ -108,7 +111,7 @@ export function IntegrationCredentials({
   const [regenerating, setRegenerating] = useState(false);
   const [message, setMessage] = useState("");
 
-  const base = `${appUrl}/api/v1/banks/${bankCode}`;
+  const base = `${ekonzoApiUrl}/api/v1/banks/${bankCode}`;
 
   async function regenerate() {
     if (
@@ -180,10 +183,11 @@ export function IntegrationCredentials({
           Endpoints ekonzo (à appeler depuis votre application)
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          À coller dans la configuration de votre portail bancaire.
+          URL publique ekonzo — à coller dans la configuration de votre portail
+          bancaire (<code>EKONZO_API_URL</code>).
         </p>
         <div className="mt-4 grid gap-3">
-          <CopyField label="EKONZO_API_URL" value={appUrl} mono />
+          <CopyField label="EKONZO_API_URL" value={ekonzoApiUrl} mono />
           <CopyField
             label="Sessions de paiement (GET)"
             value={`${base}/payments/sessions?token=…`}
@@ -199,12 +203,21 @@ export function IntegrationCredentials({
 
       <div className="rounded-xl border bg-card p-5 shadow-sm ring-1 ring-rdc-navy/5">
         <h3 className="text-sm font-semibold text-rdc-navy">
-          Vos URLs enregistrées chez ekonzo
+          Vos pages enregistrées chez ekonzo
         </h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Bases sans paramètres — ekonzo ajoute les query params. Modifiez-les
+          dans{" "}
+          <a href="/bank/pages" className="font-medium text-rdc-navy underline">
+            Pages banque
+          </a>
+          .
+        </p>
         <div className="mt-4 grid gap-3">
           <CopyField label="authorizeUrl" value={authorizeUrl ?? ""} mono />
           <CopyField label="tokenUrl" value={tokenUrl ?? ""} mono />
           <CopyField label="userinfoUrl" value={userinfoUrl ?? ""} mono />
+          <CopyField label="paymentUrl" value={paymentUrl ?? ""} mono />
         </div>
       </div>
 
@@ -214,7 +227,7 @@ export function IntegrationCredentials({
 {`EKONZO_CLIENT_ID="${id}"
 EKONZO_CLIENT_SECRET="${secret}"
 EKONZO_BANK_CODE="${bankCode}"
-EKONZO_API_URL="${appUrl}"`}
+EKONZO_API_URL="${ekonzoApiUrl}"`}
         </pre>
       </div>
     </div>

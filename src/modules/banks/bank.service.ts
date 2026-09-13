@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { generateBankOAuthCredentials } from "@/modules/banks/oauth-credentials";
+import { normalizeBankPageUrl } from "@/modules/banks/bank-urls";
 
 const MAX_LOGO_BYTES = 512 * 1024; // 512 Ko
 
@@ -101,23 +102,20 @@ export async function createPartnerBank(input: {
   authorizeUrl: string;
   tokenUrl: string;
   userinfoUrl: string;
+  paymentUrl: string;
 }) {
   const email = input.email.trim().toLowerCase();
   const code = slugCode(input.code || input.shortName);
   const password = input.password;
-  const authorizeUrl = input.authorizeUrl.trim();
-  const tokenUrl = input.tokenUrl.trim();
-  const userinfoUrl = input.userinfoUrl.trim();
+  const authorizeUrl = normalizeBankPageUrl("authorizeUrl", input.authorizeUrl);
+  const tokenUrl = normalizeBankPageUrl("tokenUrl", input.tokenUrl);
+  const userinfoUrl = normalizeBankPageUrl("userinfoUrl", input.userinfoUrl);
+  const paymentUrl = normalizeBankPageUrl("paymentUrl", input.paymentUrl);
 
   if (!code) throw new Error("Code banque invalide");
   if (!email.includes("@")) throw new Error("E-mail invalide");
   if (password.length < 8) {
     throw new Error("Mot de passe : 8 caractères minimum");
-  }
-  if (!authorizeUrl || !tokenUrl || !userinfoUrl) {
-    throw new Error(
-      "URLs d'intégration requises (authorize, token, userinfo)",
-    );
   }
 
   const existing = await prisma.partnerBank.findFirst({
@@ -166,6 +164,7 @@ export async function createPartnerBank(input: {
       authorizeUrl,
       tokenUrl,
       userinfoUrl,
+      paymentUrl,
     },
   });
 
@@ -180,6 +179,26 @@ export async function createPartnerBank(input: {
   return prisma.partnerBank.findUniqueOrThrow({
     where: { id: bank.id },
     include: { user: { select: { id: true, email: true, role: true } } },
+  });
+}
+
+export async function updatePartnerBankPages(
+  bankId: string,
+  input: {
+    authorizeUrl: string;
+    tokenUrl: string;
+    userinfoUrl: string;
+    paymentUrl: string;
+  },
+) {
+  const authorizeUrl = normalizeBankPageUrl("authorizeUrl", input.authorizeUrl);
+  const tokenUrl = normalizeBankPageUrl("tokenUrl", input.tokenUrl);
+  const userinfoUrl = normalizeBankPageUrl("userinfoUrl", input.userinfoUrl);
+  const paymentUrl = normalizeBankPageUrl("paymentUrl", input.paymentUrl);
+
+  return prisma.partnerBank.update({
+    where: { id: bankId },
+    data: { authorizeUrl, tokenUrl, userinfoUrl, paymentUrl },
   });
 }
 

@@ -397,9 +397,12 @@ model PartnerBank {
   oauthClientSecret String?
   /** Conservé en base — toutes les banques partenaires utilisent leur propre IdP */
   interopMode       BankInteropMode @default(EXTERNAL)
+  /** Pages IdP / paiement — ekonzo y ajoute les query params */
   authorizeUrl      String?
   tokenUrl          String?
   userinfoUrl       String?
+  /** Page UI paiement (ex. https://banque.example/payments/pay) */
+  paymentUrl        String?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 

@@ -69,6 +69,9 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
   const [userinfoUrl, setUserinfoUrl] = useState(
     "http://localhost:3001/api/oauth/userinfo",
   );
+  const [paymentUrl, setPaymentUrl] = useState(
+    "http://localhost:3001/payments/pay",
+  );
 
   const hasBrokenLogos = banks.some((b) => isBrokenLogo(b.logoUrl));
 
@@ -100,6 +103,7 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
       form.set("authorizeUrl", authorizeUrl);
       form.set("tokenUrl", tokenUrl);
       form.set("userinfoUrl", userinfoUrl);
+      form.set("paymentUrl", paymentUrl);
       if (logo) form.set("logo", logo);
 
       const res = await fetch("/api/admin/banks", { method: "POST", body: form });
@@ -305,6 +309,19 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
                 onChange={(e) => setUserinfoUrl(e.target.value)}
                 required
               />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="paymentUrl">URL page paiement</Label>
+              <Input
+                id="paymentUrl"
+                value={paymentUrl}
+                onChange={(e) => setPaymentUrl(e.target.value)}
+                placeholder="https://banque.example/payments/pay"
+                required
+              />
+              <p className="text-[11px] text-muted-foreground">
+                ekonzo y ajoutera <code>?token=…&amp;client_id=…</code>
+              </p>
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="logo">Logo de la banque</Label>

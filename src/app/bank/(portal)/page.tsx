@@ -6,17 +6,11 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { PageHeader } from "@/components/page-header";
 import { requireRole } from "@/lib/session";
+import { ekonzoPublicApiUrl } from "@/lib/urls";
 import { getBankByUserId } from "@/modules/banks/bank.service";
 import { ensureBankOAuthCredentials } from "@/modules/banks/bank-link.service";
 import { isUsableLogoUrl } from "@/lib/logo";
 import { IntegrationCredentials } from "./components/IntegrationCredentials";
-
-function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(
-    /\/$/,
-    "",
-  );
-}
 
 export default async function BankHomePage() {
   const session = await requireRole("BANK", "/bank/login");
@@ -73,7 +67,8 @@ export default async function BankHomePage() {
           authorizeUrl={bank.authorizeUrl}
           tokenUrl={bank.tokenUrl}
           userinfoUrl={bank.userinfoUrl}
-          appUrl={appUrl()}
+          paymentUrl={bank.paymentUrl}
+          ekonzoApiUrl={ekonzoPublicApiUrl()}
         />
       ) : (
         <p className="text-sm text-muted-foreground">
