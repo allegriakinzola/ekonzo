@@ -70,6 +70,7 @@ export function buildOtpEmail(code: string, type: OtpEmailType = "email-verifica
       heading: copy.heading,
       bodyHtml,
       text,
+      preheader: `${copy.heading} · code ${safeCode} · 5 min`,
       footerNote:
         "Ne communiquez jamais ce code. Les équipes ekonzo ne vous le demanderont pas par téléphone ni par e-mail.",
     }),
