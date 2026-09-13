@@ -11,6 +11,7 @@ import {
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { swalConfirm } from "@/lib/swal";
 
 function CopyField({
   label,
@@ -115,9 +116,12 @@ export function IntegrationCredentials({
 
   async function regenerate() {
     if (
-      !window.confirm(
-        "Régénérer les clés ? Les anciennes (client_id / secret) cesseront de fonctionner immédiatement.",
-      )
+      !(await swalConfirm({
+        title: "Régénérer les clés ?",
+        text: "Les anciennes (client_id / secret) cesseront de fonctionner immédiatement.",
+        confirmText: "Régénérer",
+        danger: true,
+      }))
     ) {
       return;
     }

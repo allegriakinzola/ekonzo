@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
+import { swalConfirm, swalError } from "@/lib/swal";
 
 export type CustomerRow = {
   id: string;
@@ -113,14 +114,20 @@ export function CustomersManager({
         prev.map((c) => (c.id === id ? { ...c, isActive: data.isActive } : c)),
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur");
+      await swalError(err instanceof Error ? err.message : "Erreur");
     } finally {
       setActionId(null);
     }
   }
 
   async function remove(id: string) {
-    if (!confirm("Supprimer ce client bancaire ?")) return;
+    const ok = await swalConfirm({
+      title: "Supprimer ce client ?",
+      text: "Cette action est irréversible.",
+      confirmText: "Supprimer",
+      danger: true,
+    });
+    if (!ok) return;
     setActionId(id);
     try {
       const res = await fetch(`/api/bank/customers/${id}`, { method: "DELETE" });
@@ -128,7 +135,7 @@ export function CustomersManager({
       if (!res.ok) throw new Error(data.error || "Suppression impossible");
       setCustomers((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur");
+      await swalError(err instanceof Error ? err.message : "Erreur");
     } finally {
       setActionId(null);
     }

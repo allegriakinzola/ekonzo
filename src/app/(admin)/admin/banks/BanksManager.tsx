@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { swalError } from "@/lib/swal";
 import {
   Table,
   TableBody,
@@ -142,7 +143,7 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
         prev.map((b) => (b.id === id ? { ...b, isActive: data.isActive } : b)),
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur");
+      await swalError(err instanceof Error ? err.message : "Erreur");
     } finally {
       setActionId(null);
     }
@@ -150,7 +151,7 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
 
   async function uploadLogo(id: string, file: File) {
     if (file.size > 512 * 1024) {
-      alert("Logo trop volumineux (maximum 512 Ko)");
+      await swalError("Logo trop volumineux (maximum 512 Ko)");
       return;
     }
     setActionId(id);
@@ -169,7 +170,7 @@ export function BanksManager({ initialBanks }: { initialBanks: BankRow[] }) {
         ),
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur");
+      await swalError(err instanceof Error ? err.message : "Erreur");
     } finally {
       setActionId(null);
     }

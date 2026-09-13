@@ -73,14 +73,14 @@ export default async function PaymentReturnPage({
             )}
           </div>
           <CardTitle className="text-xl text-rdc-navy">
-            {paid ? "Paiement confirmé" : "Paiement en attente"}
+            {paid ? "Paiement confirmé" : "Paiement non abouti"}
           </CardTitle>
           <CardDescription>
             {paid
               ? bank
                 ? `${bank.shortName} a notifié ekonzo du règlement.`
                 : "Votre banque a notifié ekonzo du règlement."
-              : "Si vous venez de payer, patientez quelques secondes puis actualisez."}
+              : "Le règlement n'a pas été confirmé. Cette tentative n'apparaît pas dans votre portefeuille."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -98,7 +98,7 @@ export default async function PaymentReturnPage({
             <div className="flex justify-between gap-3">
               <span className="text-muted-foreground">Statut</span>
               <span className="font-medium">
-                {paid ? "Paiement confirmé" : "En attente de paiement"}
+                {paid ? "Paiement confirmé" : "Non abouti"}
               </span>
             </div>
             {subscription.paymentRef && (
@@ -112,16 +112,32 @@ export default async function PaymentReturnPage({
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button className="flex-1" render={<Link href="/portfolio" />}>
-              Voir mon portefeuille
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1"
-              render={<Link href="/products" />}
-            >
-              Autres émissions
-            </Button>
+            {paid ? (
+              <Button className="flex-1" render={<Link href="/portfolio" />}>
+                Voir mon portefeuille
+              </Button>
+            ) : (
+              <Button className="flex-1" render={<Link href="/products" />}>
+                Réessayer une souscription
+              </Button>
+            )}
+            {paid ? (
+              <Button
+                variant="outline"
+                className="flex-1"
+                render={<Link href="/products" />}
+              >
+                Autres émissions
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                className="flex-1"
+                render={<Link href="/dashboard" />}
+              >
+                Tableau de bord
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

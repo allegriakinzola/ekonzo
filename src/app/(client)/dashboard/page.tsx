@@ -85,7 +85,10 @@ export default async function DashboardPage() {
   ]);
 
   const realSubscriptions = subscriptions.filter(
-    (s) => s.status !== "FAILED" && s.status !== "CANCELLED",
+    (s) =>
+      s.status !== "FAILED" &&
+      s.status !== "CANCELLED" &&
+      s.status !== "PENDING_PAYMENT",
   );
   const activeOrAdjudicated = realSubscriptions.filter((s) =>
     ["ADJUDICATED", "ACTIVE", "PAYMENT_CONFIRMED", "SUBMITTED"].includes(s.status)
@@ -120,7 +123,10 @@ export default async function DashboardPage() {
     {
       label: "Souscriptions",
       value: realSubscriptions.length.toString(),
-      sub: `${realSubscriptions.filter((s) => s.status === "PENDING_PAYMENT").length} en attente de paiement`,
+      sub:
+        activeOrAdjudicated.length > 0
+          ? `${activeOrAdjudicated.length} placement${activeOrAdjudicated.length > 1 ? "s" : ""} confirmé${activeOrAdjudicated.length > 1 ? "s" : ""}`
+          : "Aucun placement confirmé",
       icon: ChartLineUpIcon,
       accent: "text-emerald-700 bg-emerald-50 ring-emerald-100",
     },

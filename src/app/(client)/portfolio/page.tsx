@@ -82,10 +82,9 @@ export default async function PortfolioPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  /** Tentatives abandonnées — pas des souscriptions au sens métier */
-  const discarded = new Set(["FAILED", "CANCELLED"]);
+  /** Tentatives non abouties — invisibles pour l'investisseur */
+  const discarded = new Set(["FAILED", "CANCELLED", "PENDING_PAYMENT"]);
   const realSubscriptions = subscriptions.filter((s) => !discarded.has(s.status));
-  const failedSubscriptions = subscriptions.filter((s) => discarded.has(s.status));
 
   const activeSubscriptions = realSubscriptions.filter((s) =>
     [
@@ -176,9 +175,6 @@ export default async function PortfolioPage() {
             <p className="text-xs text-muted-foreground">
               {activeSubscriptions.length} active
               {activeSubscriptions.length > 1 ? "s" : ""}
-              {failedSubscriptions.length > 0
-                ? ` · ${failedSubscriptions.length} échouée${failedSubscriptions.length > 1 ? "s" : ""} exclue${failedSubscriptions.length > 1 ? "s" : ""}`
-                : ""}
             </p>
           </CardContent>
         </Card>
